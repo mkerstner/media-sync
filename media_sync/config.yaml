@@ -2,8 +2,13 @@ name: Media Sync
 version: "1.0.0"
 slug: media_sync
 url: https://github.com/mkerstner/media-sync/tree/main/media_sync
-image: ghcr.io/mkerstner/media-sync-{arch}
 description: Two-way sync between your media library and a remote server over an encrypted connection - from the UI, an automation or a terminal
+# Without an "image" key the Supervisor builds from the Dockerfile on the
+# user's own machine. Add
+#   image: ghcr.io/mkerstner/media-sync-{arch}
+# only once the build workflow has published images for every arch listed
+# below AND those packages are public - otherwise installing fails with a 403.
+# Each version bump then needs a matching published tag.
 arch:
   - aarch64
   - amd64
