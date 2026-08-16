@@ -1,20 +1,44 @@
 #!/usr/bin/with-contenv bashio
 # Translate the app options into the environment media-sync.sh expects,
 # then run it once and exit.
-set -e
+set -eo pipefail
 
 STATE_DIR="/config/media_sync"
 REQUEST_FILE="${STATE_DIR}/request.json"
+LOG_FILE="${STATE_DIR}/media-sync.log"
 KEY_DIR="/ssl/media_sync"
 KEY_FILE="${KEY_DIR}/remote.key"
 
+# The shared log lives in /config, which is included in backups, so keep it
+# bounded. The app is one-shot, so recent activity is replayed into this run's
+# output before starting - that way the Log tab shows how we got here.
+LOG_MAX_LINES=2000
+LOG_HISTORY_LINES=50
+
 mkdir -p "${STATE_DIR}" "${KEY_DIR}"
+
+bashio::log.level "$(bashio::config 'log_level')"
+
+log_line() {
+  printf '%s  %-7s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" "$2" >> "${LOG_FILE}"
+}
+
+if [ -f "${LOG_FILE}" ]; then
+  if [ "$(wc -l < "${LOG_FILE}")" -gt "${LOG_MAX_LINES}" ]; then
+    tail -n "${LOG_MAX_LINES}" "${LOG_FILE}" > "${LOG_FILE}.trimmed"
+    mv "${LOG_FILE}.trimmed" "${LOG_FILE}"
+  fi
+  echo "----- recent activity -------------------------------------------"
+  tail -n "${LOG_HISTORY_LINES}" "${LOG_FILE}"
+  echo "----- this run --------------------------------------------------"
+fi
 
 if ! bashio::fs.file_exists "${KEY_FILE}"; then
   bashio::log.warning "No SSH key yet, generating one at ${KEY_FILE}"
   ssh-keygen -t ed25519 -N "" -f "${KEY_FILE}" -C "media-sync" >/dev/null
   bashio::log.warning "Install this public key on the remote server, then start the app again:"
   bashio::log.warning "$(cat "${KEY_FILE}.pub")"
+  log_line "app" "generated a new SSH key at ${KEY_FILE}"
 fi
 chmod 600 "${KEY_FILE}"
 
@@ -65,4 +89,16 @@ if bashio::fs.file_exists "${REQUEST_FILE}"; then
 fi
 
 bashio::log.info "Running media sync ${args:-(full bidirectional run)}"
-exec /media-sync.sh --no-hop ${args}
+log_line "run" "started ${args:-(both directions)}"
+
+# tee so the run appears both in the Log tab and in the shared log
+status=0
+/media-sync.sh --no-hop ${args} 2>&1 | tee -a "${LOG_FILE}" || status=$?
+
+if [ "${status}" -eq 0 ]; then
+  log_line "run" "finished"
+else
+  log_line "run" "failed (exit ${status})"
+fi
+
+exit "${status}"

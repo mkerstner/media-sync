@@ -27,6 +27,7 @@ map:
   - type: ssl
     read_only: false
 options:
+  log_level: info
   remote_host: storage.example.com
   remote_user: username
   remote_port: 22
@@ -56,6 +57,7 @@ options:
     - "*.tmp"
     - "*.partial"
 schema:
+  log_level: list(trace|debug|info|notice|warning|error|fatal)
   remote_host: str
   remote_user: str
   remote_port: port

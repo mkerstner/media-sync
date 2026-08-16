@@ -63,6 +63,7 @@ Everything travels over SSH — the same encrypted connection SFTP and SCP use.
 
 | Setting | What it does |
 | --- | --- |
+| `log_level` | How much detail to print. `info` by default; set `debug` when something is not behaving. |
 | `remote_host` | Address of the remote server. |
 | `remote_user` | Account to log in as. |
 | `remote_port` | SSH port. Usually `22`; a Hetzner Storage Box uses `23`. |
@@ -98,6 +99,32 @@ matches at any depth. A trailing `/` matches folders only.
 
 Anything you exclude is also protected from deletion, so confirming a deletion
 will never sweep away something you asked to be ignored.
+
+## Logs
+
+Open the **Log** tab of the app. Because the app runs once and stops, it also
+replays the last 50 lines of recent activity before each run, so you see how
+you got here rather than just the run in front of you.
+
+Both halves write to the same file, `/config/media_sync/media-sync.log`:
+
+```
+2026-08-16 15:40:02  action  sync (both directions) requested by Matthias
+2026-08-16 15:40:03  run     started
+2026-08-16 15:40:03 direction: both
+2026-08-16 15:40:05 [Media pull] 2 item(s) present in the destination but not the source:
+2026-08-16 15:52:10 Done
+2026-08-16 15:52:11  run     finished
+2026-08-17 03:30:00  action  sync (both directions) requested by an automation or script
+```
+
+`action` lines come from Home Assistant and record what was asked for and by
+whom. `run` lines bracket each run, and everything between them is the sync
+itself.
+
+The file is trimmed to its last 2000 lines each time the app starts, so it
+cannot grow without limit — worth knowing because `/config` is included in
+your backups.
 
 ## How the two halves talk
 
