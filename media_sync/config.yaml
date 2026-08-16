@@ -1,0 +1,67 @@
+name: Media Sync
+version: "1.0.0"
+slug: media_sync
+url: https://github.com/mkerstner/media-sync/tree/main/media_sync
+image: ghcr.io/mkerstner/media-sync-{arch}
+description: Two-way sync between your media library and a remote server over an encrypted connection - from the UI, an automation or a terminal
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+# Runs once per invocation and exits; Home Assistant starts it on demand.
+init: false
+startup: once
+boot: manual
+map:
+  - type: media
+    read_only: false
+  - type: config
+    read_only: false
+  - type: ssl
+    read_only: false
+options:
+  remote_host: storage.example.com
+  remote_user: username
+  remote_port: 22
+  remote_base: ""
+  direction: both
+  folders:
+    - name: Media
+      remote: Media
+      local: /media/Media
+      exclude: ""
+    - name: Documents
+      remote: "."
+      local: /media/Documents
+      exclude: /Media/
+  include_dirs: []
+  exclude_patterns:
+    - .DS_Store
+    - ._*
+    - Thumbs.db
+    - desktop.ini
+    - "@eaDir/"
+    - "#recycle/"
+    - lost+found/
+    - .Trash-*/
+    - $RECYCLE.BIN/
+    - System Volume Information/
+    - "*.tmp"
+    - "*.partial"
+schema:
+  remote_host: str
+  remote_user: str
+  remote_port: port
+  remote_base: str?
+  direction: list(both|pull|push)
+  folders:
+    - name: str
+      remote: str
+      local: str
+      exclude: str?
+  include_dirs:
+    - str
+  exclude_patterns:
+    - str
