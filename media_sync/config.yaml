@@ -1,5 +1,5 @@
 name: Media Sync
-version: "1.0.0"
+version: "1.0.3"
 slug: media_sync
 url: https://github.com/mkerstner/media-sync/tree/main/media_sync
 description: Two-way sync between your media library and a remote server over an encrypted connection - from the UI, an automation or a terminal
@@ -12,9 +12,6 @@ description: Two-way sync between your media library and a remote server over an
 arch:
   - aarch64
   - amd64
-  - armhf
-  - armv7
-  - i386
 # Runs once per invocation and exits; Home Assistant starts it on demand.
 init: false
 startup: once
