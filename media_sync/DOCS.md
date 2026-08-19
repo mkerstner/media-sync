@@ -50,12 +50,6 @@ Everything travels over SSH — the same encrypted connection SFTP and SCP use.
    the public half to its log.
 4. Give that public key to your remote server, so it will let Home Assistant in
    without a password. On most servers you append it to `~/.ssh/authorized_keys`.
-   A Hetzner Storage Box has its own command for this:
-
-   ```
-   cat /ssl/media_sync/remote.key.pub | ssh -p23 <user>@<user>.your-storagebox.de install-ssh-key
-   ```
-
 5. Fill in the settings below, then install the **Media Sync** integration to
    get buttons, status and the deletion confirmation.
 
