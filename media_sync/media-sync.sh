@@ -23,6 +23,9 @@ usage: media-sync.sh [options]
       --push-only         local -> remote only
       --yes               assume "yes" to delete confirmations (DANGEROUS)
       --no-delete-check   do not look for things to delete (faster)
+  -q, --quiet             print totals only
+  -v, --verbose           print every file transferred
+      --progress          print every file, plus how far along the run is
       --no-hop            internal: we already have rsync here
 USAGE
 }
@@ -58,6 +61,9 @@ Documents|.|$MEDIA_DIR/Documents|/Media/
 # If non-empty, ONLY these top-level folders are synced inside every pair;
 # everything else at the pair root is ignored in both directions.
 INCLUDE_DIRS="${INCLUDE_DIRS:-}"
+
+# How much rsync prints: quiet, summary, files, progress or debug.
+VERBOSITY="${VERBOSITY:-summary}"
 
 # --- never synchronise ------------------------------------------------------
 # rsync filter syntax: a leading / anchors the pattern to the pair root,
@@ -114,6 +120,9 @@ for arg in "$@"; do
     --push-only)       DO_PULL=0;       FWD="$FWD --push-only" ;;
     --yes)             ASSUME_YES=1;    FWD="$FWD --yes" ;;
     --no-delete-check) CHECK_DELETES=0; FWD="$FWD --no-delete-check" ;;
+    -q|--quiet)        VERBOSITY=quiet;    FWD="$FWD --quiet" ;;
+    -v|--verbose)      VERBOSITY=files;    FWD="$FWD --verbose" ;;
+    --progress)        VERBOSITY=progress; FWD="$FWD --progress" ;;
     --no-hop)          NO_HOP=1 ;;
     -h|--help)         usage; exit 0 ;;
     *) echo "unknown option: $arg" >&2; usage >&2; exit 2 ;;
@@ -260,10 +269,17 @@ RSYNC_BASE="-a -u --partial --human-readable --modify-window=1"
 
 if [ "$DRY_RUN" -eq 1 ]; then
   RSYNC_OUT="--dry-run --itemize-changes --stats"
-elif [ -t 1 ]; then
-  RSYNC_OUT="-v --progress"
 else
-  RSYNC_OUT="--info=stats2"
+  case "$VERBOSITY" in
+    quiet)    RSYNC_OUT="--info=stats0" ;;
+    files)    RSYNC_OUT="-v --info=stats2" ;;
+    # A per-file progress bar only makes sense on a terminal. Anywhere else
+    # use the single aggregate line, so a log stays readable.
+    progress) if [ -t 1 ]; then RSYNC_OUT="-v --progress --info=stats2"
+              else                RSYNC_OUT="-v --info=progress2,stats2"; fi ;;
+    debug)    RSYNC_OUT="-vv --itemize-changes --info=progress2,stats2" ;;
+    *)        RSYNC_OUT="--info=stats2" ;;
+  esac
 fi
 
 # ---- filter compilation ----------------------------------------------------

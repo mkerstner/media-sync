@@ -1,5 +1,5 @@
 name: Media Sync
-version: "1.0.5"
+version: "1.0.6"
 slug: media_sync
 url: https://github.com/mkerstner/media-sync/tree/main/media_sync
 description: Two-way sync between your media library and a remote server over an encrypted connection - from the UI, an automation or a terminal
@@ -25,6 +25,7 @@ map:
     read_only: false
 options:
   log_level: info
+  rsync_verbosity: summary
   remote_host: storage.example.com
   remote_user: username
   remote_port: 22
@@ -55,6 +56,7 @@ options:
     - "*.partial"
 schema:
   log_level: list(trace|debug|info|notice|warning|error|fatal)
+  rsync_verbosity: list(quiet|summary|files|progress|debug)
   remote_host: str
   remote_user: str
   remote_port: port

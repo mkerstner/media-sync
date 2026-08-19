@@ -58,7 +58,8 @@ Everything travels over SSH — the same encrypted connection SFTP and SCP use.
 
 | Setting | What it does |
 | --- | --- |
-| `log_level` | How much detail to print. `info` by default; set `debug` when something is not behaving. |
+| `log_level` | How much detail the app itself prints. `info` by default; set `debug` when something is not behaving. |
+| `rsync_verbosity` | How much the sync itself prints. See below. |
 | `remote_host` | Address of the remote server. |
 | `remote_user` | Account to log in as. |
 | `remote_port` | SSH port. Usually `22`; a Hetzner Storage Box uses `23`. |
@@ -85,6 +86,27 @@ folders:
 - `remote` is relative to `remote_base`. Use `"."` for the whole of it.
 - `exclude` is a comma-separated list that applies to this entry only. That is
   how the `Documents` entry above keeps its hands off `/Media`.
+
+### `rsync_verbosity`
+
+How much the sync prints while it runs. Everything it prints ends up in the
+Log tab and in the shared log file.
+
+| Value | What you see |
+| --- | --- |
+| `quiet` | Nothing but errors. |
+| `summary` | Totals at the end of each folder: how many files moved, how much data. The default. |
+| `files` | One line per file transferred, plus the totals. |
+| `progress` | Every file, plus how far along the run is. |
+| `debug` | Everything, including why rsync decided to transfer each file. |
+
+`progress` shows a live percentage and transfer rate, which is useful while
+watching the Log tab during a big first sync. It also writes far more than the
+other settings, so the shared log fills up and gets trimmed sooner. `files` is
+usually the better everyday choice if you want to see what moved.
+
+A dry run always itemises every change regardless of this setting — that is
+the point of a dry run.
 
 ### Patterns
 
@@ -150,7 +172,8 @@ REMOTE_KEY=/ssl/media_sync/remote.key \
 Options: `--dry-run` to see what would happen, `--scan-only` to look for
 deletions without copying anything, `--pull-only` and `--push-only` to go one
 way, `--no-delete-check` to skip the deletion scan, and `--yes` to go ahead and
-delete without being asked.
+delete without being asked. `-q`, `-v` and `--progress` override
+`rsync_verbosity` for that one run.
 
 To trigger the app instead, so it uses the settings you configured and reports
 back to Home Assistant, drop a request file and start it. Home Assistant

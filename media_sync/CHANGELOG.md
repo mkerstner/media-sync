@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.6
+
+- Added an `rsync_verbosity` setting, so you can choose between totals only,
+  one line per file, or live progress while a sync runs.
+
 ## 1.0.5
 
 No functional changes. Released so the version in `config.yaml` lines up with

@@ -53,6 +53,7 @@ if ! bashio::fs.file_exists "${KEY_FILE}"; then
 fi
 chmod 600 "${KEY_FILE}"
 
+export VERBOSITY="$(bashio::config 'rsync_verbosity')"
 export REMOTE_HOST="$(bashio::config 'remote_host')"
 export REMOTE_USER="$(bashio::config 'remote_user')"
 export REMOTE_PORT="$(bashio::config 'remote_port')"
