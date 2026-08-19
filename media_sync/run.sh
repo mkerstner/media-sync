@@ -8,6 +8,8 @@ REQUEST_FILE="${STATE_DIR}/request.json"
 LOG_FILE="${STATE_DIR}/media-sync.log"
 KEY_DIR="/ssl/media_sync"
 KEY_FILE="${KEY_DIR}/remote.key"
+SCRIPT_DIR="/config/scripts"
+SCRIPT_COPY="${SCRIPT_DIR}/media-sync.sh"
 
 # The shared log lives in /config, which is included in backups, so keep it
 # bounded. The app is one-shot, so recent activity is replayed into this run's
@@ -15,7 +17,7 @@ KEY_FILE="${KEY_DIR}/remote.key"
 LOG_MAX_LINES=2000
 LOG_HISTORY_LINES=50
 
-mkdir -p "${STATE_DIR}" "${KEY_DIR}"
+mkdir -p "${STATE_DIR}" "${KEY_DIR}" "${SCRIPT_DIR}"
 
 bashio::log.level "$(bashio::config 'log_level')"
 
@@ -31,6 +33,15 @@ if [ -f "${LOG_FILE}" ]; then
   echo "----- recent activity -------------------------------------------"
   tail -n "${LOG_HISTORY_LINES}" "${LOG_FILE}"
   echo "----- this run --------------------------------------------------"
+fi
+
+# Keep a runnable copy where users can reach it. It is refreshed on every
+# start so it never drifts from the version the app itself runs.
+if ! cmp -s /media-sync.sh "${SCRIPT_COPY}"; then
+  cp /media-sync.sh "${SCRIPT_COPY}"
+  chmod +x "${SCRIPT_COPY}"
+  bashio::log.info "Refreshed ${SCRIPT_COPY}"
+  log_line "app" "refreshed ${SCRIPT_COPY}"
 fi
 
 if ! bashio::fs.file_exists "${KEY_FILE}"; then

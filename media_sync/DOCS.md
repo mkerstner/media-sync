@@ -16,8 +16,9 @@ There are three ways to start a sync, and they all do the same thing:
   status you can put on a dashboard. This is the easy way.
 - **From an automation.** The integration adds actions you can call on a
   schedule or from any trigger, with a choice of direction.
-- **From a terminal.** `media-sync.sh` runs on its own, with no Home Assistant
-  involved at all. See the last section.
+- **From a terminal.** The app drops a copy of the sync script at
+  `/config/scripts/media-sync.sh`, which runs on its own with no Home
+  Assistant involved. See the last section.
 
 However you start it, the outcome is recorded in the same place, so a run you
 kick off by hand still shows up in Home Assistant.
@@ -45,7 +46,8 @@ Everything travels over SSH — the same encrypted connection SFTP and SCP use.
 1. Go to **Settings → Apps → ⋮ → Repositories** and add
    `https://github.com/mkerstner/media-sync`.
 2. Find **Media Sync** in the store and install it.
-3. Start it once. It creates a key at `/ssl/media_sync/remote.key` and prints
+3. Start it once. It creates a key at `/ssl/media_sync/remote.key`, drops a
+   copy of the sync script at `/config/scripts/media-sync.sh`, and prints
    the public half to its log.
 4. Give that public key to your remote server, so it will let Home Assistant in
    without a password. On most servers you append it to `~/.ssh/authorized_keys`.
@@ -59,7 +61,7 @@ Everything travels over SSH — the same encrypted connection SFTP and SCP use.
 | `log_level` | How much detail to print. `info` by default; set `debug` when something is not behaving. |
 | `remote_host` | Address of the remote server. |
 | `remote_user` | Account to log in as. |
-| `remote_port` | SSH port. Usually `22`. |
+| `remote_port` | SSH port. Usually `22`; a Hetzner Storage Box uses `23`. |
 | `remote_base` | Folder on the server that the entries in `folders` are relative to. Leave empty to start from the login's home folder. |
 | `direction` | `both` compares the two sides and keeps whichever file is newer. `pull` only brings files down, `push` only sends them up. |
 | `folders` | Which folders to keep in sync. See below. |
@@ -130,19 +132,14 @@ Anything that would have been deleted is also written out in readable form to
 
 ## Running it from a terminal
 
-To trigger the app, drop a request file and start it. Home Assistant assigns
-the app a slug based on the repository it came from, so look it up rather than
-guessing:
+The app keeps a runnable copy of the sync script at
+`/config/scripts/media-sync.sh`. It is written the first time the app starts
+and refreshed on every start after that, so it is always the same version the
+app itself runs. That also means **your changes to that file are overwritten** —
+copy it under another name if you want to customise it.
 
-```
-mkdir -p /config/media_sync
-echo '{"args":["--dry-run"]}' > /config/media_sync/request.json
-ha addons list          # find the slug ending in media_sync
-ha addons start <slug>
-```
-
-To sync without involving the app at all, copy `media-sync.sh` somewhere such
-as `/config/scripts/` and pass the same settings as environment variables:
+To sync without involving Home Assistant at all, run it and pass the settings
+as environment variables:
 
 ```
 REMOTE_HOST=storage.example.com REMOTE_USER=username REMOTE_PORT=22 \
@@ -154,3 +151,15 @@ Options: `--dry-run` to see what would happen, `--scan-only` to look for
 deletions without copying anything, `--pull-only` and `--push-only` to go one
 way, `--no-delete-check` to skip the deletion scan, and `--yes` to go ahead and
 delete without being asked.
+
+To trigger the app instead, so it uses the settings you configured and reports
+back to Home Assistant, drop a request file and start it. Home Assistant
+assigns the app a slug based on the repository it came from, so look it up
+rather than guessing:
+
+```
+mkdir -p /config/media_sync
+echo '{"args":["--dry-run"]}' > /config/media_sync/request.json
+ha addons list          # find the slug ending in media_sync
+ha addons start <slug>
+```

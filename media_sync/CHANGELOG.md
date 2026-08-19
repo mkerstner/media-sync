@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.4
+
+- The sync script is now placed at `/config/scripts/media-sync.sh` on every
+  app start, so it is there to run by hand without copying it first.
+
 ## 1.0.3
 
 - Added a shared activity log at `/config/media_sync/media-sync.log`, written
