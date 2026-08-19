@@ -8,8 +8,7 @@ side is listed and left alone, and the Media Sync integration asks you before
 removing it.
 
 It works with any server you can reach over SSH — a NAS, a VPS, a rented
-storage box. A Hetzner Storage Box is used as the example below, but nothing
-here is specific to it.
+storage box.
 
 There are three ways to start a sync, and they all do the same thing:
 
