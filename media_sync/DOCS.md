@@ -59,7 +59,7 @@ Everything travels over SSH — the same encrypted connection SFTP and SCP use.
 | `log_level` | How much detail to print. `info` by default; set `debug` when something is not behaving. |
 | `remote_host` | Address of the remote server. |
 | `remote_user` | Account to log in as. |
-| `remote_port` | SSH port. Usually `22`; a Hetzner Storage Box uses `23`. |
+| `remote_port` | SSH port. Usually `22`. |
 | `remote_base` | Folder on the server that the entries in `folders` are relative to. Leave empty to start from the login's home folder. |
 | `direction` | `both` compares the two sides and keeps whichever file is newer. `pull` only brings files down, `push` only sends them up. |
 | `folders` | Which folders to keep in sync. See below. |
