@@ -1,8 +1,20 @@
 # Changelog
 
+## 1.0.8
+
+- The settings now show readable names and an explanation of what each
+  one does, instead of the raw option keys.
+
+## 1.0.7
+
+- Renamed the `rsync_verbosity` setting to `sync_log_verbosity`.
+- Added a `changes` level, which shows what changed about each file.
+  With six levels the setting now renders as a dropdown rather than a
+  row of radio buttons.
+
 ## 1.0.6
 
-- Added an `rsync_verbosity` setting, so you can choose between totals only,
+- Added a `sync_log_verbosity` setting, so you can choose between totals only,
   one line per file, or live progress while a sync runs.
 
 ## 1.0.5

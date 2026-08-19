@@ -1,0 +1,64 @@
+configuration:
+  log_level:
+    name: App log detail
+    description: >-
+      How much the app itself writes to its log. Leave this on info unless you
+      are chasing a problem, then try debug.
+  sync_log_verbosity:
+    name: Sync log detail
+    description: >-
+      How much the sync writes while it runs. Summary gives totals only, files
+      lists what moved, changes also says what was different about each file,
+      and progress adds a live percentage. The higher settings fill the log
+      faster.
+  remote_host:
+    name: Remote server
+    description: >-
+      Address of the server to sync with, for example storage.example.com.
+  remote_user:
+    name: Username
+    description: >-
+      The account to log in as on that server.
+  remote_port:
+    name: SSH port
+    description: >-
+      The port the server listens on for SSH. Usually 22.
+  remote_base:
+    name: Base folder on the server
+    description: >-
+      The folder that the remote paths below are counted from. Leave it empty
+      to start from the home folder of the account you log in as.
+  direction:
+    name: Sync direction
+    description: >-
+      Both compares the two sides and keeps whichever copy of a file is newer.
+      Pull only brings files down from the server, push only sends them up.
+  folders:
+    name: Folders to keep in sync
+    description: >-
+      Each entry pairs one folder on the server with one in Home Assistant.
+    fields:
+      name:
+        name: Label
+        description: A short name for this pair, used in the log.
+      remote:
+        name: Folder on the server
+        description: >-
+          Counted from the base folder above. Use a single dot for all of it.
+      local:
+        name: Folder in Home Assistant
+        description: The full path on this machine, such as /media/Movies.
+      exclude:
+        name: Skip within this pair
+        description: >-
+          Comma-separated patterns to leave out of this pair only.
+  include_dirs:
+    name: Only sync these folders
+    description: >-
+      Leave this empty to sync everything. If you add entries, only those
+      top-level folders are synced and the rest is ignored.
+  exclude_patterns:
+    name: Never sync these
+    description: >-
+      Patterns for things to always skip, such as system files and half
+      finished downloads. Anything skipped here is also safe from deletion.

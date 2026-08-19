@@ -25,6 +25,7 @@ usage: media-sync.sh [options]
       --no-delete-check   do not look for things to delete (faster)
   -q, --quiet             print totals only
   -v, --verbose           print every file transferred
+      --changes           print every file and what changed about it
       --progress          print every file, plus how far along the run is
       --no-hop            internal: we already have rsync here
 USAGE
@@ -62,7 +63,7 @@ Documents|.|$MEDIA_DIR/Documents|/Media/
 # everything else at the pair root is ignored in both directions.
 INCLUDE_DIRS="${INCLUDE_DIRS:-}"
 
-# How much rsync prints: quiet, summary, files, progress or debug.
+# How much rsync prints: quiet, summary, files, changes, progress or debug.
 VERBOSITY="${VERBOSITY:-summary}"
 
 # --- never synchronise ------------------------------------------------------
@@ -122,6 +123,7 @@ for arg in "$@"; do
     --no-delete-check) CHECK_DELETES=0; FWD="$FWD --no-delete-check" ;;
     -q|--quiet)        VERBOSITY=quiet;    FWD="$FWD --quiet" ;;
     -v|--verbose)      VERBOSITY=files;    FWD="$FWD --verbose" ;;
+    --changes)         VERBOSITY=changes;  FWD="$FWD --changes" ;;
     --progress)        VERBOSITY=progress; FWD="$FWD --progress" ;;
     --no-hop)          NO_HOP=1 ;;
     -h|--help)         usage; exit 0 ;;
@@ -273,6 +275,7 @@ else
   case "$VERBOSITY" in
     quiet)    RSYNC_OUT="--info=stats0" ;;
     files)    RSYNC_OUT="-v --info=stats2" ;;
+    changes)  RSYNC_OUT="-v --itemize-changes --info=stats2" ;;
     # A per-file progress bar only makes sense on a terminal. Anywhere else
     # use the single aggregate line, so a log stays readable.
     progress) if [ -t 1 ]; then RSYNC_OUT="-v --progress --info=stats2"
