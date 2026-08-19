@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.5
+
+No functional changes. Released so the version in `config.yaml` lines up with
+the GitHub release tag.
+
 ## 1.0.4
 
 - The sync script is now placed at `/config/scripts/media-sync.sh` on every
