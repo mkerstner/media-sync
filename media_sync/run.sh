@@ -14,8 +14,8 @@ SCRIPT_COPY="${SCRIPT_DIR}/media-sync.sh"
 # The shared log lives in /config, which is included in backups, so keep it
 # bounded. The app is one-shot, so recent activity is replayed into this run's
 # output before starting - that way the Log tab shows how we got here.
-LOG_MAX_LINES=2000
 LOG_HISTORY_LINES=50
+LOG_MAX_BYTES=1048576
 
 mkdir -p "${STATE_DIR}" "${KEY_DIR}" "${SCRIPT_DIR}"
 
@@ -25,11 +25,46 @@ log_line() {
   printf '%s  %-7s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" "$2" >> "${LOG_FILE}"
 }
 
-if [ -f "${LOG_FILE}" ]; then
-  if [ "$(wc -l < "${LOG_FILE}")" -gt "${LOG_MAX_LINES}" ]; then
-    tail -n "${LOG_MAX_LINES}" "${LOG_FILE}" > "${LOG_FILE}.trimmed"
-    mv "${LOG_FILE}.trimmed" "${LOG_FILE}"
+prune_log() {
+  [ -f "${LOG_FILE}" ] || return 0
+
+  _keep_days="$(bashio::config 'log_keep_days')"
+  case "${_keep_days}" in
+    ''|*[!0-9]*) _keep_days=14 ;;
+  esac
+
+  # GNU date syntax is not available here, so work the cutoff out from epoch
+  # seconds and format it back.
+  _cutoff_epoch=$(( $(date -u +%s) - _keep_days * 86400 ))
+  _cutoff="$(date -u -d "@${_cutoff_epoch}" '+%Y-%m-%d' 2>/dev/null \
+             || date -u -r "${_cutoff_epoch}" '+%Y-%m-%d' 2>/dev/null || true)"
+
+  if [ -n "${_cutoff}" ]; then
+    # Indented lines carry no date of their own; they belong to the entry
+    # above, so the keep decision carries forward across them.
+    if awk -v cutoff="${_cutoff}" '
+          /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] / { keep = (substr($0, 1, 10) >= cutoff) }
+          keep
+        ' "${LOG_FILE}" > "${LOG_FILE}.pruned"; then
+      mv "${LOG_FILE}.pruned" "${LOG_FILE}"
+    else
+      rm -f "${LOG_FILE}.pruned"
+      bashio::log.warning "Could not prune the log; keeping it as it is."
+    fi
+  else
+    bashio::log.warning "Could not work out the log cutoff date; keeping the log as it is."
   fi
+
+  # Days alone do not bound one very noisy run, so cap the size as a backstop.
+  if [ "$(wc -c < "${LOG_FILE}")" -gt "${LOG_MAX_BYTES}" ]; then
+    mv "${LOG_FILE}" "${LOG_FILE}.1"
+    bashio::log.warning "Log passed $((LOG_MAX_BYTES / 1024))KB - earlier entries moved aside to media-sync.log.1"
+  fi
+}
+
+prune_log
+
+if [ -f "${LOG_FILE}" ]; then
   echo "----- recent activity -------------------------------------------"
   tail -n "${LOG_HISTORY_LINES}" "${LOG_FILE}"
   echo "----- this run --------------------------------------------------"

@@ -62,6 +62,7 @@ Everything travels over SSH — the same encrypted connection SFTP and SCP use.
 | --- | --- |
 | `log_level` | How much detail the app itself prints. `info` by default; set `debug` when something is not behaving. |
 | `sync_log_verbosity` | How much the sync itself prints. See below. |
+| `log_keep_days` | How many days of activity to keep in the shared log. `14` by default. |
 | `remote_host` | Address of the remote server. |
 | `remote_user` | Account to log in as. |
 | `remote_port` | SSH port. Usually `22`; a Hetzner Storage Box uses `23`. |
@@ -146,6 +147,16 @@ Both halves write to the same file, `/config/media_sync/media-sync.log`:
 2026-08-21 13:40:14 Confirm or dismiss them from the repair notification in Home Assistant.
 2026-08-21 13:40:15  run     finished
 ```
+
+`action` lines come from Home Assistant and record what was asked for and by
+whom. `run` lines bracket each run, and everything between them is the sync
+itself.
+
+Entries older than `log_keep_days` are removed each time the app starts, and an
+entry keeps its indented detail lines with it. As a backstop the file is also
+capped at 1 MB — past that, what is there is moved aside to `media-sync.log.1`
+and a fresh log is started. Both matter because `/config` is included in your
+backups.
 
 ## How the two halves talk
 

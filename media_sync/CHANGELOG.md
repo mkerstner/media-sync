@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.13
+
+- The shared log is now kept by age rather than by line count. A new
+  `log_keep_days` setting decides how far back it goes, 14 days by
+  default, and the file is capped at 1 MB as a backstop.
+
 ## 1.0.12
 
 - Pointed the automation notes at the worked examples in the integration

@@ -11,6 +11,12 @@ configuration:
       lists what moved, changes also says what was different about each file,
       and progress adds a live percentage. The higher settings fill the log
       faster.
+  log_keep_days:
+    name: Keep log entries for
+    description: >-
+      How many days of activity to keep in the shared log. Older entries
+      are removed each time the app starts. The log also has a size limit
+      of its own, so one very noisy run cannot fill your backups.
   remote_host:
     name: Remote server
     description: >-
