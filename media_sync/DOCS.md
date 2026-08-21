@@ -15,7 +15,9 @@ There are three ways to start a sync, and they all do the same thing:
 - **From the UI.** Install the Media Sync integration and you get buttons and
   status you can put on a dashboard. This is the easy way.
 - **From an automation.** The integration adds actions you can call on a
-  schedule or from any trigger, with a choice of direction.
+  schedule or from any trigger, with a choice of direction and a dry-run
+  option. Worked examples are in the
+  [integration README](https://github.com/mkerstner/media-sync-integration#automations).
 - **From a terminal.** The app drops a copy of the sync script at
   `/config/scripts/media-sync.sh`, which runs on its own with no Home
   Assistant involved. See the last section.

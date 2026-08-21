@@ -4,6 +4,8 @@
 
 - Every run now ends with a summary of what was left alone and where,
   instead of only pointing at the report file.
+- Pointed the automation notes at the worked examples in the integration
+  documentation.
 
 ## 1.0.9
 
