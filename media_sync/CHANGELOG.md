@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.3.0
+
+- The leftover-folder clean-up added in 1.2.2 is now a setting,
+  **Remove leftover folders**, and it is off by default. With it off the
+  sync behaves as it did before: a confirmed folder holding ignored files
+  stays put, and the run says so and names it. Turn the setting on to
+  have those folders removed for good.
+
+## 1.2.2
+
+- Actually fixed "cannot delete non-empty directory". The `--force` in
+  1.2.1 did not help: rsync refuses because the leftover files are
+  protected, not merely because the folder is not empty. A confirmed
+  deletion now removes the folders rsync names, and only those. Excluded
+  files anywhere else are still left alone.
+
 ## 1.2.1
 
 - Fixed "cannot delete non-empty directory". A folder you confirmed for

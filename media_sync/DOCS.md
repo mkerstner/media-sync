@@ -77,6 +77,7 @@ so a setting is written as `source.remote_host` rather than `remote_host`.
 | --- | --- |
 | `direction` | `both` compares the two sides and keeps whichever file is newer. `pull` only brings files down, `push` only sends them up. |
 | `delete_protection` | **On by default.** Nothing is deleted while it is on; items on one side only are listed for you to confirm. Turn it off and every run deletes as it goes. |
+| `force_removal` | **Off by default.** A confirmed folder that still holds ignored files cannot be removed by the sync and keeps coming back. Turn this on to remove those folders for good. |
 | `dry_run` | Report what would happen without changing anything. Applies to every run while it is on, including ones started from Home Assistant. |
 | `include_dirs` | If you fill this in, only these top-level folders are synced. Leave empty for everything. |
 | `exclude_patterns` | Things to never sync, such as system clutter and temporary files. |
@@ -140,10 +141,12 @@ uses. A leading `/` pins a pattern to the top of that folder, otherwise it
 matches at any depth. A trailing `/` matches folders only.
 
 Excluded things are protected from deletion on their own account: a
-confirmed deletion does not go hunting for them elsewhere in the tree.
-It will remove them from inside a folder you have confirmed should go,
-though — otherwise that folder could never be emptied, and it would come
-back asking for confirmation on every later run.
+confirmed deletion never goes hunting for them elsewhere in the tree.
+
+That protection has a side effect. A folder you confirmed for deletion
+cannot be removed while ignored files are still sitting inside it, so it
+survives and comes back asking for confirmation on the next run. Turning
+on `force_removal` clears those folders out, and only those.
 
 ## Logs
 

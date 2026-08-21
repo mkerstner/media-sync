@@ -146,6 +146,14 @@ if ! bashio::config.true 'sync.delete_protection'; then
   log_line "app" "deletion protection is off, this run deletes as it goes"
 fi
 
+if bashio::config.true 'sync.force_removal'; then
+  case "${args}" in
+    *--force-removal*) ;;
+    *)                 args="${args} --force-removal" ;;
+  esac
+  log_line "app" "leftover folders will be removed when a deletion is confirmed"
+fi
+
 # The settings switch wins over anything Home Assistant asked for. It is a
 # safety catch, so it has to be impossible to override by accident.
 if bashio::config.true 'sync.dry_run'; then

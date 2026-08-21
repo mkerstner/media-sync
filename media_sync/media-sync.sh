@@ -30,6 +30,8 @@ usage: media-sync.sh [options]
       --push-only         local -> remote only
       --yes               assume "yes" to delete confirmations (DANGEROUS)
       --no-delete-check   do not look for things to delete (faster)
+      --force-removal     remove a confirmed folder even when excluded files
+                          are still inside it
   -q, --quiet             print totals only
   -v, --verbose           print every file transferred
       --changes           print every file and what changed about it
@@ -117,6 +119,7 @@ SELF="${SELF:-/config/scripts/media-sync.sh}"
 
 # ---- arguments -------------------------------------------------------------
 NO_HOP=0; DRY_RUN=0; SCAN_ONLY=0; DO_PULL=1; DO_PUSH=1; ASSUME_YES=0
+FORCE_REMOVAL=0
 CHECK_DELETES=1
 FWD=""
 
@@ -128,6 +131,7 @@ for arg in "$@"; do
     --push-only)       DO_PULL=0;       FWD="$FWD --push-only" ;;
     --yes)             ASSUME_YES=1;    FWD="$FWD --yes" ;;
     --no-delete-check) CHECK_DELETES=0; FWD="$FWD --no-delete-check" ;;
+    --force-removal)   FORCE_REMOVAL=1; FWD="$FWD --force-removal" ;;
     -q|--quiet)        VERBOSITY=quiet;    FWD="$FWD --quiet" ;;
     -v|--verbose)      VERBOSITY=files;    FWD="$FWD --verbose" ;;
     --changes)         VERBOSITY=changes;  FWD="$FWD --changes" ;;
@@ -313,13 +317,55 @@ build_filter() {   # $1 = comma-separated excludes for this pair
 # ---- deletion handling -----------------------------------------------------
 # Lists what --delete *would* remove from the destination, without doing it.
 scan_deletes() {
-  rsync $RSYNC_BASE --dry-run --delete --force --itemize-changes "$FILTER_OPT" \
+  rsync $RSYNC_BASE --dry-run --delete --itemize-changes "$FILTER_OPT" \
       -e "$RSH" "$1" "$2" < /dev/null 2>/dev/null \
     | sed -n 's/^\*deleting  *//p'
 }
 
 record_pending() {   # $1 = label, $2 = newline separated paths
   printf '%s\n' "$2" | sed "s|^|$1: |" >> "$PENDING_FILE"
+}
+
+# Wrap a string so a remote shell sees it as one literal argument. Done with
+# parameter expansion rather than sed, because the backslash needed to escape
+# an embedded quote does not survive the layers of sed quoting.
+shell_quote() {
+  _in="$1"; _out=""
+  while :; do
+    case "$_in" in
+      *"'"*) _out="${_out}${_in%%\'*}'\''"; _in="${_in#*\'}" ;;
+      *)     break ;;
+    esac
+  done
+  printf "'%s'" "${_out}${_in}"
+}
+
+# rsync will not delete a directory that still holds excluded files, and says
+# so. Finish the job for exactly the paths it named - never anything else.
+remove_leftover() {   # $1 = destination root, $2 = path relative to it
+  _root="$1"; _rel="$2"
+
+  case "$_rel" in
+    ''|/*|*..*)
+      log "[$label] refusing to remove an unexpected path: $_rel"
+      return 0
+      ;;
+  esac
+
+  case "$_root" in
+    *:*)
+      _host="${_root%%:*}"
+      _path="${_root#*:}"
+      log "[$label] removing leftover on the server: $_rel"
+      $RSH "$_host" "rm -rf -- $(shell_quote "${_path}${_rel}")" </dev/null \
+        || log "[$label] could not remove $_rel on the server"
+      ;;
+    *)
+      log "[$label] removing leftover: $_rel"
+      rm -rf -- "${_root}${_rel}" \
+        || log "[$label] could not remove $_rel"
+      ;;
+  esac
 }
 
 sync_one_way() {
@@ -344,10 +390,7 @@ sync_one_way() {
         record_pending "$label" "$dels"
         log "[$label] $MODE - $count item(s) would be deleted, left alone"
       elif confirm "[$label] Delete these $count item(s) from the destination?"; then
-        # --force lets a confirmed directory go even when excluded
-        # leftovers are still inside it. Without it rsync refuses, and
-        # the item comes back for confirmation on every later run.
-        del_opt="--delete --force"
+        del_opt="--delete"
         log "[$label] deletions confirmed"
       else
         record_pending "$label" "$dels"
@@ -359,8 +402,39 @@ sync_one_way() {
   [ "$SCAN_ONLY" -eq 1 ] && return 0
 
   log "[$label] syncing..."
-  rsync $RSYNC_BASE $RSYNC_OUT $del_opt "$FILTER_OPT" -e "$RSH" "$src" "$dst" < /dev/null \
-    || die "[$label] rsync failed"
+
+  # Keep the output streaming while also capturing it, so leftovers can be
+  # picked out afterwards. $? of a pipeline is tee's, so stash rsync's own.
+  _rsync_out="/tmp/media-sync.out.$$"
+  _rsync_rc="/tmp/media-sync.rc.$$"
+  {
+    rsync $RSYNC_BASE $RSYNC_OUT $del_opt "$FILTER_OPT" -e "$RSH" "$src" "$dst" \
+      < /dev/null 2>&1
+    echo $? > "$_rsync_rc"
+  } | tee "$_rsync_out"
+  _status="$(cat "$_rsync_rc" 2>/dev/null || echo 1)"
+  rm -f "$_rsync_rc"
+
+  # rsync leaves a folder behind when excluded files are still inside it.
+  # Only clear those up when asked to, and only for the paths rsync named.
+  if [ -n "$del_opt" ] && [ -s "$_rsync_out" ]; then
+    _stuck="$(sed -n 's/^cannot delete non-empty directory: //p' "$_rsync_out")"
+    if [ -n "$_stuck" ]; then
+      if [ "$FORCE_REMOVAL" -eq 1 ]; then
+        printf '%s\n' "$_stuck" | while IFS= read -r leftover; do
+          remove_leftover "$dst" "$leftover"
+        done
+      else
+        _n="$(printf '%s\n' "$_stuck" | wc -l | tr -d ' ')"
+        log "[$label] $_n folder(s) stayed behind because excluded files are still inside:"
+        printf '%s\n' "$_stuck" | sed 's/^/      /'
+        log "[$label] turn on \"Remove leftover folders\" in the settings to clear these"
+      fi
+    fi
+  fi
+  rm -f "$_rsync_out"
+
+  [ "$_status" -eq 0 ] || die "[$label] rsync failed (exit $_status)"
 }
 
 # ---- step 4: run both directions for every pair ----------------------------

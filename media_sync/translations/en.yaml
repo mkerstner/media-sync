@@ -31,6 +31,15 @@ configuration:
           Both compares the two sides and keeps whichever copy of a file is
           newer. Pull only brings files down from the server, push only sends
           them up.
+      force_removal:
+        name: Remove leftover folders
+        description: >-
+          Off by default. When you confirm a folder should go and it still
+          holds files the sync ignores, such as Thumbs.db, the sync cannot
+          remove it and it comes back asking again next time. Turn this on
+          to have those folders removed for good. Only folders you have
+          already confirmed are touched; ignored files elsewhere are left
+          alone either way.
       dry_run:
         name: Test run only
         description: >-
