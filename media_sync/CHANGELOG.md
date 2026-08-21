@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.1
+
+- Silenced a Supervisor deprecation warning by asking for
+  `homeassistant_config` instead of `config`. The folder is pinned to
+  the same place inside the app, so nothing else changes.
+
 ## 1.1.0
 
 **Your settings are reset by this update.** Note down your server

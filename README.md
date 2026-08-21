@@ -1,7 +1,19 @@
-# Media Sync
+<div align="center">
 
-Keeps your media library and a remote server in sync, in both directions, and
-asks before it deletes anything.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="media_sync/logo-dark.png">
+  <img src="media_sync/logo.png" alt="Media Sync" width="420">
+</picture>
+
+<h3>Keeps your media library and a remote server in sync, in both directions</h3>
+<p>Two-way, over an encrypted SSH connection, and it asks before it deletes anything.</p>
+
+<a href="https://github.com/mkerstner/media-sync/releases"><img alt="Release" src="https://img.shields.io/github/v/release/mkerstner/media-sync?style=flat-square"></a>
+<a href="https://github.com/mkerstner/media-sync-integration"><img alt="Integration" src="https://img.shields.io/badge/companion-integration-03a9f4?style=flat-square"></a>
+
+</div>
+
+---
 
 Works with any server you can reach over SSH — a NAS, a VPS, a rented storage
 box. Everything travels over an encrypted SSH connection, using a key the app
