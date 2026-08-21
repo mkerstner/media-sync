@@ -33,6 +33,13 @@ configuration:
     description: >-
       Both compares the two sides and keeps whichever copy of a file is newer.
       Pull only brings files down from the server, push only sends them up.
+  dry_run:
+    name: Test run only
+    description: >-
+      Go through the motions and report what would happen, without
+      copying or deleting anything. Useful for checking your settings
+      before the first real sync. While this is on it applies to every
+      run, including ones started from Home Assistant.
   folders:
     name: Folders to keep in sync
     description: >-

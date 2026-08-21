@@ -100,6 +100,17 @@ if bashio::fs.file_exists "${REQUEST_FILE}"; then
   esac
 fi
 
+# The settings switch wins over anything Home Assistant asked for. It is a
+# safety catch, so it has to be impossible to override by accident.
+if bashio::config.true 'dry_run'; then
+  case "${args}" in
+    *--dry-run*) ;;
+    *)           args="${args} --dry-run" ;;
+  esac
+  bashio::log.warning "Dry run is switched on in the settings - nothing will be written."
+  log_line "app" "dry run is on in the settings, this run changes nothing"
+fi
+
 bashio::log.info "Running media sync ${args:-(full bidirectional run)}"
 log_line "run" "started ${args:-(both directions)}"
 

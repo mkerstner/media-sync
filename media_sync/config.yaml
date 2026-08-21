@@ -1,5 +1,5 @@
 name: Media Sync
-version: "1.0.8"
+version: "1.0.9"
 slug: media_sync
 url: https://github.com/mkerstner/media-sync/tree/main/media_sync
 description: Two-way sync between your media library and a remote server over an encrypted connection - from the UI, an automation or a terminal
@@ -31,6 +31,7 @@ options:
   remote_port: 22
   remote_base: ""
   direction: both
+  dry_run: false
   folders:
     - name: Media
       remote: Media
@@ -62,6 +63,7 @@ schema:
   remote_port: port
   remote_base: str?
   direction: list(both|pull|push)
+  dry_run: bool
   folders:
     - name: str
       remote: str

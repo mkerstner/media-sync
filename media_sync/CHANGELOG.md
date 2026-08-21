@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.9
+
+- Added a `dry_run` setting. While it is on, every run reports what it
+  would do without copying or deleting anything, including runs started
+  from Home Assistant.
+
 ## 1.0.8
 
 - The settings now show readable names and an explanation of what each

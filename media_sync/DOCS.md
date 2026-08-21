@@ -65,6 +65,7 @@ Everything travels over SSH — the same encrypted connection SFTP and SCP use.
 | `remote_port` | SSH port. Usually `22`; a Hetzner Storage Box uses `23`. |
 | `remote_base` | Folder on the server that the entries in `folders` are relative to. Leave empty to start from the login's home folder. |
 | `direction` | `both` compares the two sides and keeps whichever file is newer. `pull` only brings files down, `push` only sends them up. |
+| `dry_run` | Report what would happen without changing anything. Applies to every run while it is on, including ones started from Home Assistant. |
 | `folders` | Which folders to keep in sync. See below. |
 | `include_dirs` | If you fill this in, only these top-level folders are synced. Leave empty for everything. |
 | `exclude_patterns` | Things to never sync, such as system clutter and temporary files. |
