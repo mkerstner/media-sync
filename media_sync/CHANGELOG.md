@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.10
+
+- Every run now ends with a summary of what was left alone and where,
+  instead of only pointing at the report file.
+
 ## 1.0.9
 
 - Added a `dry_run` setting. While it is on, every run reports what it

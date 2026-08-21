@@ -129,22 +129,21 @@ you got here rather than just the run in front of you.
 Both halves write to the same file, `/config/media_sync/media-sync.log`:
 
 ```
-2026-08-16 15:40:02  action  sync (both directions) requested by Matthias
-2026-08-16 15:40:03  run     started
-2026-08-16 15:40:03 direction: both
-2026-08-16 15:40:05 [Media pull] 2 item(s) present in the destination but not the source:
-2026-08-16 15:52:10 Done
-2026-08-16 15:52:11  run     finished
-2026-08-17 03:30:00  action  sync (both directions) requested by an automation or script
+2026-08-21 13:36:02  action  sync (both directions) requested by Matthias
+2026-08-21 13:36:03  run     started
+2026-08-21 13:36:05 [Documents pull] 3 item(s) present in the destination but not the source:
+      Notes/draft.md
+      Notes/old.md
+      x.txt
+2026-08-21 13:36:51 [Documents pull] not confirmed - 3 item(s) left alone
+2026-08-21 13:40:14 Done
+2026-08-21 13:40:14 5 item(s) exist on one side only and were left alone:
+      3 in [Documents pull]
+      2 in [Media push]
+2026-08-21 13:40:14 Full list: /config/media_sync/deletions.txt
+2026-08-21 13:40:14 Confirm or dismiss them from the repair notification in Home Assistant.
+2026-08-21 13:40:15  run     finished
 ```
-
-`action` lines come from Home Assistant and record what was asked for and by
-whom. `run` lines bracket each run, and everything between them is the sync
-itself.
-
-The file is trimmed to its last 2000 lines each time the app starts, so it
-cannot grow without limit — worth knowing because `/config` is included in
-your backups.
 
 ## How the two halves talk
 

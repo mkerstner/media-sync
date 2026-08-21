@@ -335,13 +335,13 @@ sync_one_way() {
 
       if [ "$MODE" != "sync" ]; then
         record_pending "$label" "$dels"
-        log "[$label] $MODE - not deleting"
+        log "[$label] $MODE - $count item(s) would be deleted, left alone"
       elif confirm "[$label] Delete these $count item(s) from the destination?"; then
         del_opt="--delete"
         log "[$label] deletions confirmed"
       else
         record_pending "$label" "$dels"
-        log "[$label] NOT deleting - list appended to $DELETE_REPORT"
+        log "[$label] not confirmed - $count item(s) left alone"
       fi
     fi
   fi
@@ -387,8 +387,25 @@ EOF
 FINISHED=1
 write_state ok ""
 
+# Close every run with what was found, so the outcome is readable without
+# scrolling back through the whole run or opening the report file.
+summarise_pending() {
+  [ -s "$PENDING_FILE" ] || return 0
+  _total="$(wc -l < "$PENDING_FILE" | tr -d ' ')"
+  log "$_total item(s) exist on one side only and were left alone:"
+  sed 's/:.*//' "$PENDING_FILE" | sort | uniq -c \
+    | while read -r _n _label; do
+        printf '      %s in [%s]\n' "$_n" "$_label"
+      done
+  log "Full list: $DELETE_REPORT"
+  [ "$MODE" = "sync" ] && log "Confirm or dismiss them from the repair notification in Home Assistant."
+  true
+}
+
 case "$MODE" in
   dry_run) log "Dry run complete - nothing was changed" ;;
-  scan)    log "Scan complete - $(wc -l < "$PENDING_FILE" | tr -d ' ') deletion candidate(s)" ;;
+  scan)    log "Scan complete" ;;
   *)       log "Done" ;;
 esac
+
+summarise_pending
