@@ -139,8 +139,11 @@ the point of a dry run.
 uses. A leading `/` pins a pattern to the top of that folder, otherwise it
 matches at any depth. A trailing `/` matches folders only.
 
-Anything you exclude is also protected from deletion, so confirming a deletion
-will never sweep away something you asked to be ignored.
+Excluded things are protected from deletion on their own account: a
+confirmed deletion does not go hunting for them elsewhere in the tree.
+It will remove them from inside a folder you have confirmed should go,
+though — otherwise that folder could never be emptied, and it would come
+back asking for confirmation on every later run.
 
 ## Logs
 

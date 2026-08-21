@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.1
+
+- Fixed "cannot delete non-empty directory". A folder you confirmed for
+  deletion was left behind whenever excluded clutter such as `.DS_Store`
+  or `@eaDir` was still inside it, and it then came back asking for
+  confirmation on every later run. Confirmed deletions now take that
+  clutter with them. Excluded files elsewhere are still left alone.
+
 ## 1.2.0
 
 - Added a **Deletion protection** setting. It is on by default and is

@@ -313,7 +313,7 @@ build_filter() {   # $1 = comma-separated excludes for this pair
 # ---- deletion handling -----------------------------------------------------
 # Lists what --delete *would* remove from the destination, without doing it.
 scan_deletes() {
-  rsync $RSYNC_BASE --dry-run --delete --itemize-changes "$FILTER_OPT" \
+  rsync $RSYNC_BASE --dry-run --delete --force --itemize-changes "$FILTER_OPT" \
       -e "$RSH" "$1" "$2" < /dev/null 2>/dev/null \
     | sed -n 's/^\*deleting  *//p'
 }
@@ -344,7 +344,10 @@ sync_one_way() {
         record_pending "$label" "$dels"
         log "[$label] $MODE - $count item(s) would be deleted, left alone"
       elif confirm "[$label] Delete these $count item(s) from the destination?"; then
-        del_opt="--delete"
+        # --force lets a confirmed directory go even when excluded
+        # leftovers are still inside it. Without it rsync refuses, and
+        # the item comes back for confirmation on every later run.
+        del_opt="--delete --force"
         log "[$label] deletions confirmed"
       else
         record_pending "$label" "$dels"
