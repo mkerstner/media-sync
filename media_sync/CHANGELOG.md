@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.1.0
+
+**Your settings are reset by this update.** Note down your server
+details and folder pairs before updating, then enter them again
+afterwards.
+
+- The options screen is now grouped into Source server, Syncing,
+  Folders and Advanced, instead of one long list.
+- Because the settings moved into groups, every one of them has a new
+  name internally, and the Supervisor cannot carry the old values
+  across. In YAML a setting is now written as `source.remote_host`
+  rather than `remote_host`.
+- Labels lost their prefixes now that the group says what they are:
+  "Remote server" became "Address", "SSH port" became "Port".
+
+## 1.0.14
+
+- The sync script now says in its header that it belongs to this app,
+  where to find the documentation, and that the copy in
+  `/config/scripts/` is replaced on every start.
+
 ## 1.0.13
 
 - The shared log is now kept by age rather than by line count. A new

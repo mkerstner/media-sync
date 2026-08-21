@@ -19,7 +19,7 @@ LOG_MAX_BYTES=1048576
 
 mkdir -p "${STATE_DIR}" "${KEY_DIR}" "${SCRIPT_DIR}"
 
-bashio::log.level "$(bashio::config 'log_level')"
+bashio::log.level "$(bashio::config 'advanced.log_level')"
 
 log_line() {
   printf '%s  %-7s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" "$2" >> "${LOG_FILE}"
@@ -28,7 +28,7 @@ log_line() {
 prune_log() {
   [ -f "${LOG_FILE}" ] || return 0
 
-  _keep_days="$(bashio::config 'log_keep_days')"
+  _keep_days="$(bashio::config 'advanced.log_keep_days')"
   case "${_keep_days}" in
     ''|*[!0-9]*) _keep_days=14 ;;
   esac
@@ -88,11 +88,11 @@ if ! bashio::fs.file_exists "${KEY_FILE}"; then
 fi
 chmod 600 "${KEY_FILE}"
 
-export VERBOSITY="$(bashio::config 'sync_log_verbosity')"
-export REMOTE_HOST="$(bashio::config 'remote_host')"
-export REMOTE_USER="$(bashio::config 'remote_user')"
-export REMOTE_PORT="$(bashio::config 'remote_port')"
-export REMOTE_BASE="$(bashio::config 'remote_base')"
+export VERBOSITY="$(bashio::config 'advanced.sync_log_verbosity')"
+export REMOTE_HOST="$(bashio::config 'source.remote_host')"
+export REMOTE_USER="$(bashio::config 'source.remote_user')"
+export REMOTE_PORT="$(bashio::config 'source.remote_port')"
+export REMOTE_BASE="$(bashio::config 'source.remote_base')"
 export REMOTE_KEY="${KEY_FILE}"
 export KNOWN_HOSTS="${KEY_DIR}/known_hosts"
 export STATE_FILE="${STATE_DIR}/state.json"
@@ -106,20 +106,20 @@ done
 export SYNC_PAIRS="${pairs}"
 
 includes=""
-for index in $(bashio::config 'include_dirs|keys'); do
-  includes="${includes}$(bashio::config "include_dirs[${index}]")
+for index in $(bashio::config 'sync.include_dirs|keys'); do
+  includes="${includes}$(bashio::config "sync.include_dirs[${index}]")
 "
 done
 export INCLUDE_DIRS="${includes}"
 
 excludes=""
-for index in $(bashio::config 'exclude_patterns|keys'); do
-  excludes="${excludes}$(bashio::config "exclude_patterns[${index}]")
+for index in $(bashio::config 'sync.exclude_patterns|keys'); do
+  excludes="${excludes}$(bashio::config "sync.exclude_patterns[${index}]")
 "
 done
 export EXCLUDE_PATTERNS="${excludes}"
 
-case "$(bashio::config 'direction')" in
+case "$(bashio::config 'sync.direction')" in
   pull) args="--pull-only" ;;
   push) args="--push-only" ;;
   *)    args="" ;;
@@ -137,7 +137,7 @@ fi
 
 # The settings switch wins over anything Home Assistant asked for. It is a
 # safety catch, so it has to be impossible to override by accident.
-if bashio::config.true 'dry_run'; then
+if bashio::config.true 'sync.dry_run'; then
   case "${args}" in
     *--dry-run*) ;;
     *)           args="${args} --dry-run" ;;

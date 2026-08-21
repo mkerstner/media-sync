@@ -58,22 +58,39 @@ Everything travels over SSH — the same encrypted connection SFTP and SCP use.
 
 ## Settings
 
+The options screen is grouped into sections. In YAML the same grouping applies,
+so a setting is written as `source.remote_host` rather than `remote_host`.
+
+### Source server
+
+| Setting | What it does |
+| --- | --- |
+| `remote_host` | Hostname or IP of the server. |
+| `remote_user` | The account to log in as. |
+| `remote_port` | SSH port. Usually `22`; a Hetzner Storage Box uses `23`. |
+| `remote_base` | Folder the remote paths are counted from. Leave empty to start from the login's home folder. |
+
+### Syncing
+
+| Setting | What it does |
+| --- | --- |
+| `direction` | `both` compares the two sides and keeps whichever file is newer. `pull` only brings files down, `push` only sends them up. |
+| `dry_run` | Report what would happen without changing anything. Applies to every run while it is on, including ones started from Home Assistant. |
+| `include_dirs` | If you fill this in, only these top-level folders are synced. Leave empty for everything. |
+| `exclude_patterns` | Things to never sync, such as system clutter and temporary files. |
+
+### Advanced
+
 | Setting | What it does |
 | --- | --- |
 | `log_level` | How much detail the app itself prints. `info` by default; set `debug` when something is not behaving. |
 | `sync_log_verbosity` | How much the sync itself prints. See below. |
 | `log_keep_days` | How many days of activity to keep in the shared log. `14` by default. |
-| `remote_host` | Address of the remote server. |
-| `remote_user` | Account to log in as. |
-| `remote_port` | SSH port. Usually `22`; a Hetzner Storage Box uses `23`. |
-| `remote_base` | Folder on the server that the entries in `folders` are relative to. Leave empty to start from the login's home folder. |
-| `direction` | `both` compares the two sides and keeps whichever file is newer. `pull` only brings files down, `push` only sends them up. |
-| `dry_run` | Report what would happen without changing anything. Applies to every run while it is on, including ones started from Home Assistant. |
-| `folders` | Which folders to keep in sync. See below. |
-| `include_dirs` | If you fill this in, only these top-level folders are synced. Leave empty for everything. |
-| `exclude_patterns` | Things to never sync, such as system clutter and temporary files. |
 
-### `folders`
+### Folders
+
+`folders` sits outside the sections. It is a list of entries, which is already
+as deeply nested as the Supervisor allows, so it cannot live inside one.
 
 ```yaml
 folders:

@@ -3,6 +3,13 @@
 #
 # Keeps a remote server and the local media library in sync, in both directions.
 #
+# Part of the Media Sync app for Home Assistant.
+# Documentation and source: https://github.com/mkerstner/media-sync
+#
+# DO NOT EDIT THIS COPY. The app rewrites /config/scripts/media-sync.sh every
+# time it starts, so any change you make here is lost on the next run. Copy it
+# under another name first if you want to customise it.
+#
 # Every setting below can be overridden from the environment, which is how the
 # Media Sync app passes its options in. Run standalone and the defaults apply,
 # so the script stays usable from any shell.

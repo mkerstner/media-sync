@@ -1,51 +1,53 @@
 configuration:
-  log_level:
-    name: App log detail
+  source:
+    name: Source server
     description: >-
-      How much the app itself writes to its log. Leave this on info unless you
-      are chasing a problem, then try debug.
-  sync_log_verbosity:
-    name: Sync log detail
+      The server to sync with, and where on it to start. The app logs in over
+      SSH with a key it creates for itself, so there is no password to set.
+    fields:
+      remote_host:
+        name: Address
+        description: >-
+          Hostname or IP of the server, for example storage.example.com.
+      remote_user:
+        name: Username
+        description: The account to log in as on that server.
+      remote_port:
+        name: Port
+        description: The port the server listens on for SSH. Usually 22.
+      remote_base:
+        name: Base folder
+        description: >-
+          The folder that the remote paths below are counted from. Leave it
+          empty to start from the home folder of the account you log in as.
+  sync:
+    name: Syncing
     description: >-
-      How much the sync writes while it runs. Summary gives totals only, files
-      lists what moved, changes also says what was different about each file,
-      and progress adds a live percentage. The higher settings fill the log
-      faster.
-  log_keep_days:
-    name: Keep log entries for
-    description: >-
-      How many days of activity to keep in the shared log. Older entries
-      are removed each time the app starts. The log also has a size limit
-      of its own, so one very noisy run cannot fill your backups.
-  remote_host:
-    name: Remote server
-    description: >-
-      Address of the server to sync with, for example storage.example.com.
-  remote_user:
-    name: Username
-    description: >-
-      The account to log in as on that server.
-  remote_port:
-    name: SSH port
-    description: >-
-      The port the server listens on for SSH. Usually 22.
-  remote_base:
-    name: Base folder on the server
-    description: >-
-      The folder that the remote paths below are counted from. Leave it empty
-      to start from the home folder of the account you log in as.
-  direction:
-    name: Sync direction
-    description: >-
-      Both compares the two sides and keeps whichever copy of a file is newer.
-      Pull only brings files down from the server, push only sends them up.
-  dry_run:
-    name: Test run only
-    description: >-
-      Go through the motions and report what would happen, without
-      copying or deleting anything. Useful for checking your settings
-      before the first real sync. While this is on it applies to every
-      run, including ones started from Home Assistant.
+      How the sync behaves, and what it should leave out.
+    fields:
+      direction:
+        name: Direction
+        description: >-
+          Both compares the two sides and keeps whichever copy of a file is
+          newer. Pull only brings files down from the server, push only sends
+          them up.
+      dry_run:
+        name: Test run only
+        description: >-
+          Go through the motions and report what would happen, without copying
+          or deleting anything. Useful for checking your settings before the
+          first real sync. While this is on it applies to every run, including
+          ones started from Home Assistant.
+      include_dirs:
+        name: Only sync these folders
+        description: >-
+          Leave this empty to sync everything. If you add entries, only those
+          top-level folders are synced and the rest is ignored.
+      exclude_patterns:
+        name: Never sync these
+        description: >-
+          Patterns for things to always skip, such as system files and half
+          finished downloads. Anything skipped here is also safe from deletion.
   folders:
     name: Folders to keep in sync
     description: >-
@@ -65,13 +67,26 @@ configuration:
         name: Skip within this pair
         description: >-
           Comma-separated patterns to leave out of this pair only.
-  include_dirs:
-    name: Only sync these folders
+  advanced:
+    name: Advanced
     description: >-
-      Leave this empty to sync everything. If you add entries, only those
-      top-level folders are synced and the rest is ignored.
-  exclude_patterns:
-    name: Never sync these
-    description: >-
-      Patterns for things to always skip, such as system files and half
-      finished downloads. Anything skipped here is also safe from deletion.
+      Logging and troubleshooting. The defaults are fine for everyday use.
+    fields:
+      log_level:
+        name: App logging
+        description: >-
+          How much the app itself writes to its log. Leave this on info unless
+          you are chasing a problem, then try debug.
+      sync_log_verbosity:
+        name: Sync logging
+        description: >-
+          How much the sync writes while it runs. Summary gives totals only,
+          files lists what moved, changes also says what was different about
+          each file, and progress adds a live percentage. The higher settings
+          fill the log faster.
+      log_keep_days:
+        name: Keep log entries for
+        description: >-
+          How many days of activity to keep in the shared log. Older entries
+          are removed each time the app starts. The log also has a size limit
+          of its own, so one very noisy run cannot fill your backups.

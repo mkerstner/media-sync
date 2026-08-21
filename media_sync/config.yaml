@@ -1,5 +1,5 @@
 name: Media Sync
-version: "1.0.13"
+version: "1.1.0"
 slug: media_sync
 url: https://github.com/mkerstner/media-sync/tree/main/media_sync
 description: Two-way sync between your media library and a remote server over an encrypted connection - from the UI, an automation or a terminal
@@ -23,16 +23,32 @@ map:
     read_only: false
   - type: ssl
     read_only: false
+# Settings are grouped so the options screen reads in sections. "folders" is a
+# list of dictionaries, which is already the deepest nesting the Supervisor
+# allows, so it cannot sit inside a group - it stays here between them.
 options:
-  log_level: info
-  sync_log_verbosity: summary
-  log_keep_days: 14
-  remote_host: storage.example.com
-  remote_user: username
-  remote_port: 22
-  remote_base: ""
-  direction: both
-  dry_run: false
+  source:
+    remote_host: storage.example.com
+    remote_user: username
+    remote_port: 22
+    remote_base: ""
+  sync:
+    direction: both
+    dry_run: false
+    include_dirs: []
+    exclude_patterns:
+      - .DS_Store
+      - ._*
+      - Thumbs.db
+      - desktop.ini
+      - "@eaDir/"
+      - "#recycle/"
+      - lost+found/
+      - .Trash-*/
+      - $RECYCLE.BIN/
+      - System Volume Information/
+      - "*.tmp"
+      - "*.partial"
   folders:
     - name: Media
       remote: Media
@@ -42,36 +58,29 @@ options:
       remote: "."
       local: /media/Documents
       exclude: /Media/
-  include_dirs: []
-  exclude_patterns:
-    - .DS_Store
-    - ._*
-    - Thumbs.db
-    - desktop.ini
-    - "@eaDir/"
-    - "#recycle/"
-    - lost+found/
-    - .Trash-*/
-    - $RECYCLE.BIN/
-    - System Volume Information/
-    - "*.tmp"
-    - "*.partial"
+  advanced:
+    log_level: info
+    sync_log_verbosity: summary
+    log_keep_days: 14
 schema:
-  log_level: list(trace|debug|info|notice|warning|error|fatal)
-  sync_log_verbosity: list(quiet|summary|files|changes|progress|debug)
-  log_keep_days: int(1,365)
-  remote_host: str
-  remote_user: str
-  remote_port: port
-  remote_base: str?
-  direction: list(both|pull|push)
-  dry_run: bool
+  source:
+    remote_host: str
+    remote_user: str
+    remote_port: port
+    remote_base: str?
+  sync:
+    direction: list(both|pull|push)
+    dry_run: bool
+    include_dirs:
+      - str
+    exclude_patterns:
+      - str
   folders:
     - name: str
       remote: str
       local: str
       exclude: str?
-  include_dirs:
-    - str
-  exclude_patterns:
-    - str
+  advanced:
+    log_level: list(trace|debug|info|notice|warning|error|fatal)
+    sync_log_verbosity: list(quiet|summary|files|changes|progress|debug)
+    log_keep_days: int(1,365)
