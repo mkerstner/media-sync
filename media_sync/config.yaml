@@ -1,5 +1,5 @@
 name: Media Sync
-version: "1.1.1"
+version: "1.2.0"
 slug: media_sync
 url: https://github.com/mkerstner/media-sync/tree/main/media_sync
 description: Two-way sync between your media library and a remote server over an encrypted connection - from the UI, an automation or a terminal
@@ -38,6 +38,7 @@ options:
   sync:
     direction: both
     dry_run: false
+    delete_protection: true
     include_dirs: []
     exclude_patterns:
       - .DS_Store
@@ -74,6 +75,7 @@ schema:
   sync:
     direction: list(both|pull|push)
     dry_run: bool
+    delete_protection: bool
     include_dirs:
       - str
     exclude_patterns:

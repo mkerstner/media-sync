@@ -135,6 +135,17 @@ if bashio::fs.file_exists "${REQUEST_FILE}"; then
   esac
 fi
 
+# Deletion protection is on unless the user has deliberately turned it off.
+# Off means every run deletes as it goes, with no confirmation step.
+if ! bashio::config.true 'sync.delete_protection'; then
+  case "${args}" in
+    *--yes*) ;;
+    *)       args="${args} --yes" ;;
+  esac
+  bashio::log.warning "Deletion protection is OFF - anything missing on one side will be deleted on the other."
+  log_line "app" "deletion protection is off, this run deletes as it goes"
+fi
+
 # The settings switch wins over anything Home Assistant asked for. It is a
 # safety catch, so it has to be impossible to override by accident.
 if bashio::config.true 'sync.dry_run'; then

@@ -38,6 +38,14 @@ configuration:
           or deleting anything. Useful for checking your settings before the
           first real sync. While this is on it applies to every run, including
           ones started from Home Assistant.
+      delete_protection:
+        name: Deletion protection
+        description: >-
+          On by default, and it is what stops a sync removing anything on
+          its own. While it is on, a file that is on one side but not the
+          other is listed and left alone, and Home Assistant asks you
+          before it goes. Turn it off and every run deletes as it goes,
+          with nothing to confirm. You can turn it back on at any time.
       include_dirs:
         name: Only sync these folders
         description: >-

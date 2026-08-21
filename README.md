@@ -6,7 +6,7 @@
 </picture>
 
 <h3>Keeps your media library and a remote server in sync, in both directions</h3>
-<p>Two-way, over an encrypted SSH connection, and it asks before it deletes anything.</p>
+<p>Two-way, over an encrypted SSH connection. Deletion protection is on by default, so nothing goes without your say-so.</p>
 
 <a href="https://github.com/mkerstner/media-sync/releases"><img alt="Release" src="https://img.shields.io/github/v/release/mkerstner/media-sync?style=flat-square"></a>
 <a href="https://github.com/mkerstner/media-sync-integration"><img alt="Integration" src="https://img.shields.io/badge/companion-integration-03a9f4?style=flat-square"></a>

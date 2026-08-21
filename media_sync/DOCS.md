@@ -3,9 +3,10 @@
 Keeps your media library and a remote server in sync, in both directions.
 
 Each run compares the two sides and copies whichever copy of a file is newer.
-Nothing is ever deleted without your say-so: anything that exists on only one
-side is listed and left alone, and the Media Sync integration asks you before
-removing it.
+Nothing is deleted unless you ask for it. By default, anything that exists on
+only one side is listed and left alone, and the Media Sync integration asks you
+before it goes. That protection can be turned off if you would rather each run
+just got on with it.
 
 It works with any server you can reach over SSH — a NAS, a VPS, a rented
 storage box.
@@ -75,6 +76,7 @@ so a setting is written as `source.remote_host` rather than `remote_host`.
 | Setting | What it does |
 | --- | --- |
 | `direction` | `both` compares the two sides and keeps whichever file is newer. `pull` only brings files down, `push` only sends them up. |
+| `delete_protection` | **On by default.** Nothing is deleted while it is on; items on one side only are listed for you to confirm. Turn it off and every run deletes as it goes. |
 | `dry_run` | Report what would happen without changing anything. Applies to every run while it is on, including ones started from Home Assistant. |
 | `include_dirs` | If you fill this in, only these top-level folders are synced. Leave empty for everything. |
 | `exclude_patterns` | Things to never sync, such as system clutter and temporary files. |

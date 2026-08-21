@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0
+
+- Added a **Deletion protection** setting. It is on by default and is
+  what stops a sync removing anything on its own: items on one side
+  only are listed and left for you to confirm. Turn it off and every
+  run deletes as it goes, with nothing to confirm. Nothing changes
+  unless you turn it off, and you can turn it back on at any time.
+
 ## 1.1.1
 
 - Silenced a Supervisor deprecation warning by asking for

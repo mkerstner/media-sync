@@ -1,7 +1,8 @@
 # Media Sync
 
-Keeps your media library and a remote server in sync, in both directions, and
-asks before it deletes anything.
+Keeps your media library and a remote server in sync, in both directions,
+and asks before it deletes anything — deletion protection is on by default and
+can be turned off whenever you like.
 
 Works with any server you can reach over SSH — a NAS, a VPS, a rented storage
 box. Pairs with the [Media Sync integration](https://github.com/mkerstner/media-sync-integration),
