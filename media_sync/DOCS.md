@@ -233,6 +233,52 @@ The fix is on the destination, not in the app: mount the share with options that
 preserve timestamps, or use a filesystem and account that can. Until then the
 sync stays correct - it is only wasteful.
 
+## Reviewing what was left alone
+
+When a file sits on one side but not the other, the app cannot tell whether it
+was deleted there or added here, so it leaves it alone and records it. Home
+Assistant then asks you what to do.
+
+There are two answers, not one:
+
+| Choice | What happens |
+| --- | --- |
+| **Keep** | The file is copied to the side that is missing it |
+| **Delete** | The file is removed from the side that still has it |
+
+Keeping is what actually clears an item. Before this existed the only options
+were "delete everything" or "leave it", and anything left came back on the
+next run for ever.
+
+### Why the review is by folder
+
+A run can turn up thousands of candidates, which nobody can review one by one.
+They almost always sit in a handful of folders, so the app groups them:
+
+```
+Photos/2019/jan   412 files   on Home Assistant only
+Photos/2020        38 files   on Home Assistant only
+Notes               2 files   on the server only
+```
+
+The grouping adapts. It starts as specific as it can and only rolls up to a
+shallower level when there would otherwise be too many rows.
+
+**Grouping is only how the list is shown.** Deciding on a folder acts on the
+recorded candidates inside it and nothing else - a folder holding two
+candidates usually holds hundreds of correctly synced files, and those are
+never touched.
+
+### Before anything is deleted
+
+A deletion is re-checked at the moment it is applied. If a file has since
+appeared on the other side, it is no longer missing, so it is left alone and
+the log says how many were skipped. Decisions can therefore sit unanswered
+safely.
+
+The full candidate list lives in `/config/media_sync/pending.tsv`, and your
+decisions arrive as `/config/media_sync/decisions.tsv`. Both are plain text.
+
 ## How the two halves talk
 
 The app does one run and stops. The integration leaves the options for the next

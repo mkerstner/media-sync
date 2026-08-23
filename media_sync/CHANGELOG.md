@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.5.0
+
+- Deletion candidates can now be reviewed folder by folder, and each folder
+  can be kept or deleted rather than the whole list at once.
+- Added **Keep**, which copies a candidate to the side that is missing it.
+  Until now the only outcomes were deleting everything or leaving it, so
+  anything left alone came back on every later run.
+- The review list is grouped by folder, at the deepest level that still
+  fits on screen. Grouping is only how it is shown: acting on a folder
+  touches the recorded candidates inside it and nothing else.
+- Deletions are re-checked as they are applied. Anything that has since
+  appeared on the other side is left alone and reported.
+- New `--resolve` option applies decisions recorded by Home Assistant.
+- The state file gained `pending_groups`. The old flat `pending` list is
+  still written, capped, so an older integration keeps working.
+
 ## 1.4.0
 
 - Sync logs now say what happened in words instead of rsync codes. A line

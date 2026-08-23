@@ -30,6 +30,8 @@ usage: media-sync.sh [options]
       --push-only         local -> remote only
       --yes               assume "yes" to delete confirmations (DANGEROUS)
       --no-delete-check   do not look for things to delete (faster)
+      --resolve           apply the keep/delete decisions recorded by Home
+                          Assistant, then exit
       --force-removal     remove a confirmed folder even when excluded files
                           are still inside it
   -q, --quiet             print totals only
@@ -110,6 +112,14 @@ KNOWN_HOSTS="${KNOWN_HOSTS:-$SSH_DIR/known_hosts}"
 STATE_DIR="${STATE_DIR:-/config/media_sync}"
 STATE_FILE="${STATE_FILE:-$STATE_DIR/state.json}"
 DELETE_REPORT="${DELETE_REPORT:-$STATE_DIR/deletions.txt}"
+# Full candidate list, rewritten each run. The review UI groups these by
+# folder, but every action resolves back to exact paths from here - a folder
+# with two candidates may hold hundreds of properly synced files.
+PENDING_TSV="${PENDING_TSV:-$STATE_DIR/pending.tsv}"
+# Decisions written by the integration: action 	 label 	 folder
+DECISIONS_FILE="${DECISIONS_FILE:-$STATE_DIR/decisions.tsv}"
+# Most folder groups to show before rolling up to a shallower level.
+MAX_GROUPS="${MAX_GROUPS:-40}"
 
 LOCK_DIR="${LOCK_DIR:-/tmp/media-sync.lock}"
 FILTER_FILE="/tmp/media-sync.filter.$$"
@@ -119,6 +129,7 @@ SELF="${SELF:-/config/scripts/media-sync.sh}"
 
 # ---- arguments -------------------------------------------------------------
 NO_HOP=0; DRY_RUN=0; SCAN_ONLY=0; DO_PULL=1; DO_PUSH=1; ASSUME_YES=0
+RESOLVE=0
 FORCE_REMOVAL=0
 CHECK_DELETES=1
 FWD=""
@@ -132,6 +143,7 @@ for arg in "$@"; do
     --yes)             ASSUME_YES=1;    FWD="$FWD --yes" ;;
     --no-delete-check) CHECK_DELETES=0; FWD="$FWD --no-delete-check" ;;
     --force-removal)   FORCE_REMOVAL=1; FWD="$FWD --force-removal" ;;
+    --resolve)         RESOLVE=1;       FWD="$FWD --resolve" ;;
     -q|--quiet)        VERBOSITY=quiet;    FWD="$FWD --quiet" ;;
     -v|--verbose)      VERBOSITY=files;    FWD="$FWD --verbose" ;;
     --changes)         VERBOSITY=changes;  FWD="$FWD --changes" ;;
@@ -142,7 +154,8 @@ for arg in "$@"; do
   esac
 done
 
-if [ "$SCAN_ONLY" -eq 1 ]; then MODE="scan"
+if [ "$RESOLVE" -eq 1 ];   then MODE="resolve"
+elif [ "$SCAN_ONLY" -eq 1 ]; then MODE="scan"
 elif [ "$DRY_RUN" -eq 1 ];  then MODE="dry_run"
 else                             MODE="sync"; fi
 
@@ -167,13 +180,111 @@ prev_field() {
 
 json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
 
+# Turn the recorded candidates into the two JSON arrays the state file needs.
+# Prints exactly two lines: the legacy flat list first, the grouped list
+# second.
+#
+# Grouping exists because a flat list of a few thousand orphans is not
+# reviewable, while they almost always sit in a handful of folders. Group by
+# directory at the deepest level that still fits MAX_GROUPS, so a run stays
+# specific when it can and coarse only when it must.
+#
+# The groups are only how the list is *shown*. Every action resolves back to
+# exact paths from PENDING_TSV, because a folder holding two candidates may
+# hold hundreds of correctly synced files as well.
+#
+# No backslash appears in the awk below on purpose: it travels through several
+# quoting layers, so the field separator and the JSON escapes are built by
+# code point instead.
+pending_json() {
+  [ -s "$PENDING_FILE" ] || { printf '\n\n'; return 0; }
+  awk -v MAX="$MAX_GROUPS" -v LEGACY_MAX=200 '
+    BEGIN { FS = sprintf("%c", 9); BS = sprintf("%c", 92); QT = sprintf("%c", 34) }
+
+    function esc(s,   out, i, c) {
+      out = ""
+      for (i = 1; i <= length(s); i++) {
+        c = substr(s, i, 1)
+        if (c == BS || c == QT) out = out BS c
+        else out = out c
+      }
+      return out
+    }
+
+    function q(s) { return QT esc(s) QT }
+
+    function key(p, d,   parts, m, i, out) {
+      m = split(p, parts, "/")
+      if (m <= 1) return "(root)"
+      if (d > m - 1) d = m - 1
+      out = parts[1]
+      for (i = 2; i <= d; i++) out = out "/" parts[i]
+      return out
+    }
+
+    { label[NR] = $1; side[NR] = $2; path[NR] = $3; n = NR }
+
+    END {
+      if (n == 0) { print ""; print ""; exit 0 }
+      if (MAX == 0) MAX = 40
+
+      # Older integrations read a flat "label: path" list. Keep feeding them
+      # one, capped, so a mismatched pair still shows something rather than
+      # silently reporting nothing pending.
+      flat = ""
+      for (i = 1; i <= n && i <= LEGACY_MAX; i++) {
+        if (i > 1) flat = flat ","
+        flat = flat q(label[i] ": " path[i])
+      }
+      print flat
+
+      for (d = 6; d >= 1; d--) {
+        delete seen
+        groups = 0
+        for (i = 1; i <= n; i++) {
+          k = label[i] SUBSEP side[i] SUBSEP key(path[i], d)
+          if (!(k in seen)) { seen[k] = 1; groups++ }
+        }
+        if (groups <= MAX) break
+      }
+
+      for (i = 1; i <= n; i++) {
+        k = label[i] SUBSEP side[i] SUBSEP key(path[i], d)
+        count[k]++
+        if (!(k in order)) { order[k] = ++seq; klist[seq] = k }
+      }
+
+      out = ""
+      for (i = 1; i <= seq; i++) {
+        split(klist[i], f, SUBSEP)
+        one = "{" q("label") ":" q(f[1])
+        one = one "," q("side") ":" q(f[2])
+        one = one "," q("folder") ":" q(f[3])
+        one = one "," q("count") ":" count[klist[i]] "}"
+        if (i > 1) out = out ","
+        out = out one
+      }
+      print out
+    }
+  ' "$PENDING_FILE"
+}
+
 write_state() {   # $1 = status, $2 = error text (may be empty)
   _pending=""
+  _groups=""
   _count=0
   if [ -s "$PENDING_FILE" ]; then
     _count="$(wc -l < "$PENDING_FILE" | tr -d ' ')"
-    _pending="$(sed 's/\\/\\\\/g; s/"/\\"/g; s/^/"/; s/$/"/' "$PENDING_FILE" \
-                | tr '\n' ',' | sed 's/,$//')"
+    _both="$(pending_json)"
+    _pending="$(printf '%s\n' "$_both" | sed -n 1p)"
+    _groups="$(printf '%s\n' "$_both" | sed -n 2p)"
+    # Keep the full list where a later --resolve can find it. The state file
+    # only carries the grouped summary, so it stays small enough to re-read
+    # every few seconds.
+    mkdir -p "$(dirname "$PENDING_TSV")"
+    cp "$PENDING_FILE" "$PENDING_TSV"
+  else
+    rm -f "$PENDING_TSV" 2>/dev/null || true
   fi
   [ "$1" = "running" ] && _finished="" || _finished="$(now_iso)"
 
@@ -188,6 +299,7 @@ write_state() {   # $1 = status, $2 = error text (may be empty)
   "last_success": "$LAST_SUCCESS",
   "pending_count": $_count,
   "pending": [$_pending],
+  "pending_groups": [$_groups],
   "error": "$(json_escape "${2:-}")"
 }
 JSON
@@ -322,8 +434,19 @@ scan_deletes() {
     | sed -n 's/^\*deleting  *//p'
 }
 
+# Record deletion candidates for review. Written as TSV so the review UI can
+# say which side holds each file: the candidates of a "pull" live on the local
+# side, a "push" leaves them on the server.
 record_pending() {   # $1 = label, $2 = newline separated paths
-  printf '%s\n' "$2" | sed "s|^|$1: |" >> "$PENDING_FILE"
+  case "$1" in
+    *" pull") _side=local ;;
+    *" push") _side=remote ;;
+    *)        _side=unknown ;;
+  esac
+  printf '%s\n' "$2" | while IFS= read -r _p; do
+    [ -n "$_p" ] || continue
+    printf '%s\t%s\t%s\n' "$1" "$_side" "$_p"
+  done >> "$PENDING_FILE"
 }
 
 # Wrap a string so a remote shell sees it as one literal argument. Done with
@@ -521,6 +644,145 @@ sync_one_way() {
   [ "$_status" -eq 0 ] || die "[$label] rsync failed (exit $_status)"
 }
 
+# ---- applying review decisions ---------------------------------------------
+# Home Assistant records one line per reviewed folder: action, label, folder.
+# "keep" copies the candidates back to the side that is missing them, "delete"
+# removes them from the side that still has them.
+#
+# Decisions name folders because that is what a person can review. Actions
+# always resolve back to the exact paths recorded in PENDING_TSV - a folder
+# holding two candidates may hold hundreds of correctly synced files as well,
+# and those must not be touched.
+
+# Locate a pair by name. Prints "<remote spec><tab><local path>".
+pair_paths() {   # $1 = pair name
+  while IFS='|' read -r _n _rsub _lloc _x; do
+    [ "$_n" = "$1" ] || continue
+    case "$_rsub" in
+      .|"") _rp="${REMOTE_BASE:+$REMOTE_BASE/}" ;;
+      *)    _rp="${REMOTE_BASE:+$REMOTE_BASE/}${_rsub%/}/" ;;
+    esac
+    printf '%s@%s:%s\t%s\n' "$REMOTE_USER" "$REMOTE_HOST" "$_rp" "${_lloc%/}/"
+    return 0
+  done <<PAIRS
+$SYNC_PAIRS
+PAIRS
+}
+
+# Candidate paths for one label whose folder was marked with one action.
+# A path belongs to a folder when the folder is its prefix, which holds
+# whatever depth the grouping happened to pick.
+select_paths() {   # $1 = label, $2 = keep|delete
+  awk -v label="$1" -v action="$2" -v dec="$DECISIONS_FILE" '
+    BEGIN {
+      FS = sprintf("%c", 9)
+      while ((getline line < dec) > 0) {
+        split(line, f, FS)
+        if (f[1] == action && f[2] == label) grp[f[3]] = 1
+      }
+      close(dec)
+    }
+    function in_group(p, g) {
+      if (g == "(root)") return (index(p, "/") == 0)
+      return (substr(p, 1, length(g) + 1) == g "/")
+    }
+    $1 == label {
+      for (g in grp) if (in_group($3, g)) { print $3; next }
+    }
+  ' "$PENDING_TSV"
+}
+
+resolve_decisions() {
+  if [ ! -s "$DECISIONS_FILE" ]; then
+    log "no decisions to apply"
+    return 0
+  fi
+  if [ ! -s "$PENDING_TSV" ]; then
+    log "no recorded candidates left to act on"
+    rm -f "$DECISIONS_FILE"
+    return 0
+  fi
+
+  _acted="/tmp/media-sync.acted.$$"
+  : > "$_acted"
+
+  awk 'BEGIN { FS = sprintf("%c", 9) } { print $2 }' "$DECISIONS_FILE" \
+    | sort -u | while IFS= read -r label; do
+    [ -n "$label" ] || continue
+
+    _name="${label% *}"
+    _dir="${label##* }"
+    _pp="$(pair_paths "$_name")"
+    if [ -z "$_pp" ]; then
+      log "[$label] that folder pair no longer exists - skipped"
+      continue
+    fi
+    _remote="$(printf '%s' "$_pp" | cut -f1)"
+    _local="$(printf '%s' "$_pp" | cut -f2)"
+    case "$_dir" in
+      pull) _holder="$_local";  _other="$_remote" ;;
+      push) _holder="$_remote"; _other="$_local" ;;
+      *)    log "[$label] unrecognised direction - skipped"; continue ;;
+    esac
+
+    build_filter ""
+
+    # --- keep: copy the candidates to the side that is missing them ---------
+    _keep="/tmp/media-sync.keep.$$"
+    select_paths "$label" keep > "$_keep"
+    if [ -s "$_keep" ]; then
+      _n="$(wc -l < "$_keep" | tr -d ' ')"
+      log "[$label] keeping $_n item(s) - copying to the other side"
+      if [ "$DRY_RUN" -eq 1 ]; then
+        log "[$label] dry run - nothing copied"
+      elif rsync $RSYNC_BASE --files-from="$_keep" -e "$RSH" \
+             "$_holder" "$_other" < /dev/null 2>&1 | humanize; then
+        awk -v l="$label" 'BEGIN{T=sprintf("%c",9)} {print l T $0}' "$_keep" >> "$_acted"
+      else
+        log "[$label] could not copy the kept items"
+      fi
+    fi
+    rm -f "$_keep"
+
+    # --- delete: only what is still genuinely missing on the other side -----
+    _del="/tmp/media-sync.del.$$"
+    select_paths "$label" delete > "$_del"
+    if [ -s "$_del" ]; then
+      _n="$(wc -l < "$_del" | tr -d ' ')"
+      log "[$label] $_n item(s) marked for deletion - re-checking before removing"
+      _still="/tmp/media-sync.still.$$"
+      scan_deletes "$_other" "$_holder" > "$_still" 2>/dev/null || : > "$_still"
+      _go="/tmp/media-sync.go.$$"
+      awk 'NR==FNR { want[$0]=1; next } ($0 in want)' "$_del" "$_still" > "$_go"
+      _skipped=$(( _n - $(wc -l < "$_go" | tr -d ' ') ))
+      [ "$_skipped" -gt 0 ] && log "[$label] $_skipped no longer missing on the other side - left alone"
+      if [ "$DRY_RUN" -eq 1 ]; then
+        log "[$label] dry run - nothing deleted"
+      else
+        while IFS= read -r _p; do
+          [ -n "$_p" ] || continue
+          remove_leftover "$_holder" "$_p"
+          printf '%s\t%s\n' "$label" "$_p" >> "$_acted"
+        done < "$_go"
+      fi
+      rm -f "$_still" "$_go"
+    fi
+    rm -f "$_del"
+  done
+
+  # Whatever was not acted on is still pending, so the review list shrinks
+  # instead of emptying.
+  if [ -s "$_acted" ]; then
+    awk 'BEGIN { FS = sprintf("%c", 9); OFS = FS }
+         NR == FNR { done[$1 FS $2] = 1; next }
+         !(($1 FS $3) in done)' "$_acted" "$PENDING_TSV" > "$PENDING_FILE"
+  else
+    cp "$PENDING_TSV" "$PENDING_FILE"
+  fi
+  rm -f "$_acted"
+  [ "$DRY_RUN" -eq 1 ] || rm -f "$DECISIONS_FILE"
+}
+
 # ---- step 4: run both directions for every pair ----------------------------
 [ "$DRY_RUN" -eq 1 ] && log "DRY RUN - no files will be written"
 [ "$SCAN_ONLY" -eq 1 ] && log "SCAN ONLY - looking for deletion candidates"
@@ -529,6 +791,15 @@ log "direction: $DIRECTION"
   && log "include filter active: $(clean_list "$INCLUDE_DIRS" | tr '\n' ' ')"
 
 FILTER_OPT="--exclude-from=$FILTER_FILE"
+
+# A resolve run only applies decisions - it never syncs.
+if [ "$RESOLVE" -eq 1 ]; then
+  resolve_decisions
+  FINISHED=1
+  write_state ok ""
+  log "Review decisions applied"
+  exit 0
+fi
 
 while IFS='|' read -r name rsub lloc pair_excl; do
   [ -n "$name" ] || continue
@@ -561,7 +832,7 @@ summarise_pending() {
   [ -s "$PENDING_FILE" ] || return 0
   _total="$(wc -l < "$PENDING_FILE" | tr -d ' ')"
   log "$_total item(s) exist on one side only and were left alone:"
-  sed 's/:.*//' "$PENDING_FILE" | sort | uniq -c \
+  awk 'BEGIN { FS = sprintf("%c", 9) } { print $1 }' "$PENDING_FILE" | sort | uniq -c \
     | while read -r _n _label; do
         printf '      %s in [%s]\n' "$_n" "$_label"
       done
