@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.1
+
+- Added the Apache License 2.0. The repository previously shipped without
+  a license file, which left its terms unstated. It is now the same
+  license Home Assistant itself uses.
+
 ## 1.3.0
 
 - The leftover-folder clean-up added in 1.2.2 is now a setting,

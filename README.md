@@ -65,3 +65,5 @@ asking you to decide.
 ---
 
 By Matthias Kerstner ([@mkerstner](https://github.com/mkerstner))
+
+Licensed under the [Apache License 2.0](LICENSE).
