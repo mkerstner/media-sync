@@ -121,7 +121,7 @@ Log tab and in the shared log file.
 | `quiet` | Nothing but errors. |
 | `summary` | Totals at the end of each folder: how many files moved, how much data. The default. |
 | `files` | One line per file transferred, plus the totals. |
-| `changes` | Every file, and what changed about it — size, timestamp, permissions. |
+| `changes` | Every file, in plain words: whether it was added, updated, or only re-stamped. See [What the file lines mean](#what-the-file-lines-mean). |
 | `progress` | Every file, plus how far along the run is. |
 | `debug` | Everything, including why rsync decided to transfer each file. |
 
@@ -182,6 +182,56 @@ entry keeps its indented detail lines with it. As a backstop the file is also
 capped at 1 MB — past that, what is there is moved aside to `media-sync.log.1`
 and a fresh log is started. Both matter because `/config` is included in your
 backups.
+
+### What the file lines mean
+
+With the sync log detail set to **Changes**, and on every test run, each file
+that moved gets a line:
+
+```
+  up   new        Photos/2022/IMG_4821.jpg
+  down updated    Documents/notes.md
+  up   timestamp  Photos/2020/20200602_151740.jpg
+       new folder Photos/2022/
+       deleted    Photos/old/thing.jpg
+```
+
+`up` means the file went to the remote server, `down` means it came from there.
+
+| Word | Meaning |
+| --- | --- |
+| `new` | Did not exist on the other side |
+| `updated` | Contents differ, so the file was copied |
+| `timestamp` | Contents are identical - only the modification time or permissions differed |
+| `metadata` | Nothing was copied, only attributes were adjusted |
+| `new folder` | A directory was created |
+| `deleted` | Removed from the destination |
+
+Each direction then ends with a count:
+
+```
+[Photos up] 12 new, 3 updated, 1847 timestamp-only, 1 deleted
+```
+
+### When everything says "timestamp"
+
+If most of a run is `timestamp` lines, your files are being re-sent even though
+their contents already match. Nothing is lost or corrupted, but every run moves
+far more data than it needs to.
+
+It means the destination is not keeping the modification times or permissions it
+is handed, so the next run finds a mismatch and sends the file again. The usual
+causes:
+
+- The destination filesystem cannot represent them - an SMB, FAT or exFAT mount
+  is the common one.
+- The account on the remote server is not allowed to set ownership or
+  permissions.
+- One side was first populated by another tool that did not preserve times.
+
+The fix is on the destination, not in the app: mount the share with options that
+preserve timestamps, or use a filesystem and account that can. Until then the
+sync stays correct - it is only wasteful.
 
 ## How the two halves talk
 

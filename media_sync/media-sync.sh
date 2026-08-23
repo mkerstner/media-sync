@@ -368,6 +368,86 @@ remove_leftover() {   # $1 = destination root, $2 = path relative to it
   esac
 }
 
+# ---- readable output -------------------------------------------------------
+# rsync's --itemize-changes codes are meant for scripts, not people. Turn them
+# into words. The eleven columns are YXcstpoguax: Y is how the item was
+# updated, X is what kind of item it is, and the rest say which attributes
+# differ ('.' same, letter differs, '+' newly created).
+#
+# Written without regex intervals, because busybox awk is what runs this.
+humanize() {
+  awk '
+    {
+      if (substr($0,1,10) == "*deleting ") {
+        printf "       %-10s %s\n", "deleted", substr($0,13)
+        next
+      }
+
+      ok = 0
+      if (length($0) > 12 && substr($0,12,1) == " ") {
+        y = substr($0,1,1); x = substr($0,2,1); a = substr($0,3,9)
+        if (index("<>ch.", y) > 0 && index("fdLDS", x) > 0) {
+          ok = 1
+          for (i = 1; i <= 9; i++)
+            if (index(".+cstpoguax", substr(a,i,1)) == 0) { ok = 0; break }
+        }
+      }
+      if (!ok) { print; next }
+
+      arrow = (y == "<") ? "up  " : (y == ">") ? "down" : "    "
+      if (a == "+++++++++")                  verb = (x == "d") ? "new folder" : "new"
+      else if (y == ".")                     verb = "metadata"
+      else if (index(a,"s") || index(a,"c")) verb = "updated"
+      else                                   verb = "timestamp"
+
+      printf "  %s %-10s %s\n", arrow, verb, substr($0,13)
+    }
+  '
+}
+
+# Count what a run actually did, from the same captured output. Silent unless
+# rsync was asked to itemize, since otherwise there is nothing to count.
+tally() {   # $1 = label, $2 = captured raw rsync output
+  [ -s "$2" ] || return 0
+  awk -v label="$1" '
+    {
+      if (substr($0,1,10) == "*deleting ") { del++; next }
+
+      ok = 0
+      if (length($0) > 12 && substr($0,12,1) == " ") {
+        y = substr($0,1,1); x = substr($0,2,1); a = substr($0,3,9)
+        if (index("<>ch.", y) > 0 && index("fdLDS", x) > 0) {
+          ok = 1
+          for (i = 1; i <= 9; i++)
+            if (index(".+cstpoguax", substr(a,i,1)) == 0) { ok = 0; break }
+        }
+      }
+      if (!ok) next
+
+      if (a == "+++++++++")                  { if (x == "d") dir++; else new++ }
+      else if (y == ".")                     meta++
+      else if (index(a,"s") || index(a,"c")) upd++
+      else                                   ts++
+    }
+    END {
+      if (new + upd + ts + meta + dir + del == 0) exit 0
+
+      out = (new+0) " new, " (upd+0) " updated"
+      if (ts   > 0) out = out ", " ts " timestamp-only"
+      if (meta > 0) out = out ", " meta " metadata"
+      if (dir  > 0) out = out ", " dir " new folder(s)"
+      if (del  > 0) out = out ", " del " deleted"
+      printf "[%s] %s\n", label, out
+
+      # When nothing really changed but files moved anyway, the destination is
+      # almost certainly not preserving times or permissions. Say so once,
+      # rather than leaving it buried in the per-file lines.
+      if (ts > 20 && ts > new + upd)
+        printf "[%s] %d file(s) were re-sent only because their timestamps or permissions differ, not their contents.\n[%s] That usually means the destination cannot preserve them - see the app documentation.\n", label, ts, label
+    }
+  ' "$2"
+}
+
 sync_one_way() {
   label="$1"; src="$2"; dst="$3"
   del_opt=""
@@ -411,9 +491,13 @@ sync_one_way() {
     rsync $RSYNC_BASE $RSYNC_OUT $del_opt "$FILTER_OPT" -e "$RSH" "$src" "$dst" \
       < /dev/null 2>&1
     echo $? > "$_rsync_rc"
-  } | tee "$_rsync_out"
+  } | tee "$_rsync_out" | humanize
   _status="$(cat "$_rsync_rc" 2>/dev/null || echo 1)"
   rm -f "$_rsync_rc"
+
+  # Raw output stays in $_rsync_out, so the leftover check below still reads
+  # rsync's own wording. Only what reaches the log is rewritten.
+  tally "$label" "$_rsync_out"
 
   # rsync leaves a folder behind when excluded files are still inside it.
   # Only clear those up when asked to, and only for the paths rsync named.

@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.4.0
+
+- Sync logs now say what happened in words instead of rsync codes. A line
+  that read `<f..tp..... Photos/2020/IMG_4821.jpg` now reads
+  `up   timestamp  Photos/2020/IMG_4821.jpg`, and every direction ends
+  with a count: `[Photos up] 12 new, 3 updated, 1847 timestamp-only`.
+- Added a warning when most of a run is timestamp-only. That means the
+  destination is not keeping the times or permissions it is given, so
+  unchanged files are re-sent on every run. The log now names the problem
+  and points at the documentation instead of leaving it buried.
+- Test runs are the main beneficiary: they always itemise, so they were
+  the most likely place to meet the codes and the least likely place to
+  want them.
+
 ## 1.3.1
 
 - Added the Apache License 2.0. The repository previously shipped without
