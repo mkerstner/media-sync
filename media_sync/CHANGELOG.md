@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.7
+
+- Removed the `Config file not found - using defaults` notice from every
+  WebDAV command. The backend is configured through the environment on
+  purpose, so there is nothing to put in a config file, but rclone announces
+  the absence each time it runs. It now gets an empty one to find.
+
 ## 1.7.6
 
 - Fixed **Skip within this pair** and the global exclude list being ignored

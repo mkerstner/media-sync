@@ -131,6 +131,10 @@ MAX_GROUPS="${MAX_GROUPS:-40}"
 LOCK_DIR="${LOCK_DIR:-/tmp/media-sync.lock}"
 FILTER_FILE="/tmp/media-sync.filter.$$"
 PENDING_FILE="/tmp/media-sync.pending.$$"
+# rclone announces a missing config file on every invocation. The backend is
+# configured through the environment on purpose, so there is nothing to put in
+# one - but an empty file it can find is quieter than a notice per command.
+RCLONE_CONF="/tmp/media-sync.rclone.$$.conf"
 SELF="${SELF:-/config/scripts/media-sync.sh}"
 # ============================================================================
 
@@ -340,7 +344,7 @@ die() {
 cleanup() {
   [ "$FINISHED" -eq 0 ] && write_state failed "interrupted"
   [ "${LOCK_HELD:-0}" -eq 1 ] && rmdir "$LOCK_DIR" 2>/dev/null
-  rm -f "$FILTER_FILE" "$PENDING_FILE" 2>/dev/null
+  rm -f "$FILTER_FILE" "$PENDING_FILE" "$RCLONE_CONF" 2>/dev/null
   true
 }
 LOCK_HELD=0
@@ -462,6 +466,10 @@ case "$PROTOCOL" in
 
     # Only now hand the settled values over. Everything above can still change
     # them, and rclone reads these once.
+    : > "$RCLONE_CONF"
+    RCLONE_CONFIG="$RCLONE_CONF"
+    export RCLONE_CONFIG
+
     RCLONE_CONFIG_DAV_TYPE=webdav
     RCLONE_CONFIG_DAV_VENDOR=nextcloud
     RCLONE_CONFIG_DAV_URL="$WEBDAV_URL"
