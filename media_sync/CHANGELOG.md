@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.4
+
+- Fixed the completed WebDAV address not actually reaching rclone. The
+  address was handed over before the checks that finish it ran, so the log
+  showed the corrected address while the transfer used the original one and
+  failed with the same complaint as before.
+
 ## 1.7.3
 
 - The WebDAV address can now be just your Nextcloud address, such as

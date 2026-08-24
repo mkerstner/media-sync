@@ -424,18 +424,7 @@ case "$PROTOCOL" in
     [ -n "$WEBDAV_URL" ]  || die "no WebDAV address configured (WEBDAV_URL is empty)"
     [ -n "$WEBDAV_USER" ] || die "no WebDAV user configured (WEBDAV_USER is empty)"
     [ -n "$WEBDAV_PASS" ] || die "no WebDAV password configured (WEBDAV_PASS is empty)"
-    # Configure the backend through the environment: rclone writes no config
-    # file this way, so the credential never lands in a file of ours. Obscuring
-    # is what rclone expects of a stored password, and reading it from stdin
-    # keeps the plaintext off the command line. rclone obscures the hyphen
-    # itself when stdin is empty, which the check above rules out.
-    RCLONE_CONFIG_DAV_TYPE=webdav
-    RCLONE_CONFIG_DAV_VENDOR=nextcloud
-    RCLONE_CONFIG_DAV_URL="$WEBDAV_URL"
-    RCLONE_CONFIG_DAV_USER="$WEBDAV_USER"
-    RCLONE_CONFIG_DAV_PASS="$(printf '%s\n' "$WEBDAV_PASS" | rclone obscure -)"
-    export RCLONE_CONFIG_DAV_TYPE RCLONE_CONFIG_DAV_VENDOR RCLONE_CONFIG_DAV_URL
-    export RCLONE_CONFIG_DAV_USER RCLONE_CONFIG_DAV_PASS
+
     case "$WEBDAV_URL" in
       http://*)
         log "WARNING: the WebDAV address is http, so the password and your files travel in the clear"
@@ -470,6 +459,21 @@ case "$PROTOCOL" in
         log "NOTE: the base folder is counted from the WebDAV share, not the server's disk - reading \"$_was\" as \"$REMOTE_BASE\""
         ;;
     esac
+
+    # Only now hand the settled values over. Everything above can still change
+    # them, and rclone reads these once.
+    RCLONE_CONFIG_DAV_TYPE=webdav
+    RCLONE_CONFIG_DAV_VENDOR=nextcloud
+    RCLONE_CONFIG_DAV_URL="$WEBDAV_URL"
+    RCLONE_CONFIG_DAV_USER="$WEBDAV_USER"
+    # Configure the backend through the environment: rclone writes no config
+    # file this way, so the credential never lands in a file of ours. Obscuring
+    # is what rclone expects of a stored password, and reading it from stdin
+    # keeps the plaintext off the command line. rclone obscures the hyphen
+    # itself when stdin is empty, which the check above rules out.
+    RCLONE_CONFIG_DAV_PASS="$(printf '%s\n' "$WEBDAV_PASS" | rclone obscure -)"
+    export RCLONE_CONFIG_DAV_TYPE RCLONE_CONFIG_DAV_VENDOR RCLONE_CONFIG_DAV_URL
+    export RCLONE_CONFIG_DAV_USER RCLONE_CONFIG_DAV_PASS
 
     RSH=""
     REMOTE_PREFIX="dav:"
