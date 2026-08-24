@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.7.5
+
+- A WebDAV run no longer looks frozen while it works. Listing a share takes
+  one request per directory, so the scan for one-sided items can run for
+  minutes on a large tree. It now says what it is doing before it starts,
+  and rclone reports progress every 30 seconds instead of having its output
+  thrown away.
+- Connection and transfer timeouts are set, so a connection that dies ends
+  the run with something to read rather than waiting for ever.
+
 ## 1.7.4
 
 - Fixed the completed WebDAV address not actually reaching rclone. The

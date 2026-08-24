@@ -492,6 +492,10 @@ RSYNC_BASE="-a -u --partial --human-readable --modify-window=1"
 # file that is newer. Run both ways, that is the same newest-wins merge.
 RCLONE_BASE="--update --checkers 8 --transfers 4"
 
+# Without these a dead connection is indistinguishable from a slow one, and
+# the run waits for ever rather than failing with something to read.
+RCLONE_NET="--contimeout 30s --timeout 5m --retries 3 --low-level-retries 5"
+
 if [ "$DRY_RUN" -eq 1 ]; then
   RSYNC_OUT="--dry-run --itemize-changes --stats"
   RCLONE_OUT="--dry-run -v"
@@ -547,8 +551,8 @@ transport_sync() {   # $1 = source, $2 = destination, $3 = delete option
     # The filter file is written in rsync syntax. rclone reads the same
     # leading "+" and "-" and the same ** wildcard, which covers what
     # build_filter emits; anything more exotic would need translating.
-    rclone $_verb $RCLONE_BASE $RCLONE_OUT --filter-from "$FILTER_FILE" \
-        "$1" "$2" < /dev/null 2>&1
+    rclone $_verb $RCLONE_BASE $RCLONE_NET $RCLONE_OUT \
+        --filter-from "$FILTER_FILE" "$1" "$2" < /dev/null 2>&1
   else
     rsync $RSYNC_BASE $RSYNC_OUT $3 "$FILTER_OPT" -e "$RSH" "$1" "$2" \
         < /dev/null 2>&1
@@ -567,8 +571,13 @@ scan_deletes() {   # $1 = source, $2 = destination
     # a command substitution, so letting it through ends the run under set -e
     # before anything has been logged. A connection that genuinely fails still
     # surfaces at the transfer step.
+    # stderr is deliberately not discarded here. Listing a WebDAV share takes
+    # one request per directory, so this can run for minutes on a large tree,
+    # and the candidate paths go to stdout - leaving stderr alone is what
+    # turns a silent wait into progress and a real error into a message.
     rclone check "$1" "$2" --size-only --missing-on-src - \
-        --filter-from "$FILTER_FILE" < /dev/null 2>/dev/null || true
+        --filter-from "$FILTER_FILE" $RCLONE_NET --stats 30s \
+        --stats-log-level NOTICE < /dev/null || true
   else
     rsync $RSYNC_BASE --dry-run --delete --itemize-changes "$FILTER_OPT" \
         -e "$RSH" "$1" "$2" < /dev/null 2>/dev/null \
@@ -744,6 +753,7 @@ sync_one_way() {
   del_opt=""
 
   if [ "$CHECK_DELETES" -eq 1 ]; then
+    log "[$label] looking for items that exist on one side only..."
     dels="$(scan_deletes "$src" "$dst")"
     if [ -n "$dels" ]; then
       count="$(printf '%s\n' "$dels" | wc -l | tr -d ' ')"
