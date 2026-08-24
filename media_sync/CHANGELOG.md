@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.8.1
+
+- Excluded folders are now genuinely skipped over WebDAV instead of being
+  walked and then discarded. rclone only avoids descending into a folder for
+  a rule that ends in a slash; the rules written in 1.7.6 left out that form,
+  so an excluded folder still cost a full listing and could still report
+  errors from inside itself.
+
 ## 1.8.0
 
 - New Advanced setting **Parallel WebDAV requests**, default 16. A share has

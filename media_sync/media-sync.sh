@@ -569,12 +569,14 @@ _rclone_filter() {   # $1 = comma-separated excludes for this pair
         _b="${_p%/}"
         [ -n "$_b" ] || continue
         printf -- '- %s\n' "$_b"
+        printf -- '- %s/\n' "$_b"
         printf -- '- %s/**\n' "$_b"
       done >> "$FILTER_FILE"
 
   _inc="$(clean_list "$INCLUDE_DIRS")"
   if [ -n "$_inc" ]; then
     printf '%s\n' "$_inc" | sed 's#^/##; s#/*$##' | while IFS= read -r d; do
+      printf -- '+ /%s/\n' "$d"
       printf -- '+ /%s/**\n' "$d"
     done >> "$FILTER_FILE"
     # "- *" only covers the top level in rclone's syntax; "- **" is everything.
