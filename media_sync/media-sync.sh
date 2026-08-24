@@ -110,6 +110,7 @@ System Volume Information/
 *.!qB
 .stfolder/
 .stversions/
+.DAV/
 }"
 
 # --- transport / bookkeeping ------------------------------------------------

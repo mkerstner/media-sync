@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.2
+
+- Added `.DAV/` to the default excludes. WebDAV clients leave that folder
+  behind as their own bookkeeping, so it exists on one side, never the other,
+  and turns up as a deletion candidate for ever.
+
 ## 1.8.1
 
 - Excluded folders are now genuinely skipped over WebDAV instead of being
