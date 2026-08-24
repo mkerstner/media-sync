@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.7.1
+
+- Fixed WebDAV runs failing immediately with exit 1 and no explanation. The
+  scan for deletion candidates reports a non-zero status whenever the two
+  sides differ, which is the normal case, and that was ending the run before
+  anything had been logged. The equivalent SSH scan never hit this because
+  its output passes through a filter that masks the status.
+
 ## 1.7.0
 
 - The remote side can now be a **WebDAV share**, which is how to reach

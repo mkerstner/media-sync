@@ -521,8 +521,15 @@ scan_deletes() {   # $1 = source, $2 = destination
     # --missing-on-src is exactly this question, so there is no output format
     # to parse. --size-only keeps it from hashing a whole library to answer a
     # question about which names exist.
+    #
+    # The trailing "|| true" is load-bearing: rclone check reports a non-zero
+    # status whenever the two sides differ, which is the normal case here. The
+    # status says nothing about whether the check worked, and this runs inside
+    # a command substitution, so letting it through ends the run under set -e
+    # before anything has been logged. A connection that genuinely fails still
+    # surfaces at the transfer step.
     rclone check "$1" "$2" --size-only --missing-on-src - \
-        --filter-from "$FILTER_FILE" < /dev/null 2>/dev/null
+        --filter-from "$FILTER_FILE" < /dev/null 2>/dev/null || true
   else
     rsync $RSYNC_BASE --dry-run --delete --itemize-changes "$FILTER_OPT" \
         -e "$RSH" "$1" "$2" < /dev/null 2>/dev/null \
