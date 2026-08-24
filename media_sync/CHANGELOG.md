@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.0
+
+- Each review row now carries the first couple of filenames it stands for.
+  A row reading "Work (1 file)" named a folder and hid the one thing worth
+  knowing; it now names the file. Home Assistant renders them once the
+  integration is on 1.5.0 or newer.
+
 ## 1.5.0
 
 - Deletion candidates can now be reviewed folder by folder, and each folder

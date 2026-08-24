@@ -264,6 +264,9 @@ Notes               2 files   on the server only
 The grouping adapts. It starts as specific as it can and only rolls up to a
 shallower level when there would otherwise be too many rows.
 
+Each row also carries the first couple of filenames it stands for, because a
+folder name says nothing when it represents a single file.
+
 **Grouping is only how the list is shown.** Deciding on a folder acts on the
 recorded candidates inside it and nothing else - a folder holding two
 candidates usually holds hundreds of correctly synced files, and those are

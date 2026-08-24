@@ -198,8 +198,11 @@ json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
 # code point instead.
 pending_json() {
   [ -s "$PENDING_FILE" ] || { printf '\n\n'; return 0; }
-  awk -v MAX="$MAX_GROUPS" -v LEGACY_MAX=200 '
-    BEGIN { FS = sprintf("%c", 9); BS = sprintf("%c", 92); QT = sprintf("%c", 34) }
+  awk -v MAX="$MAX_GROUPS" -v LEGACY_MAX=200 -v EX=2 '
+    BEGIN {
+      FS = sprintf("%c", 9); BS = sprintf("%c", 92); QT = sprintf("%c", 34)
+      SEP = sprintf("%c", 31)
+    }
 
     function esc(s,   out, i, c) {
       out = ""
@@ -249,9 +252,17 @@ pending_json() {
       }
 
       for (i = 1; i <= n; i++) {
-        k = label[i] SUBSEP side[i] SUBSEP key(path[i], d)
+        g = key(path[i], d)
+        k = label[i] SUBSEP side[i] SUBSEP g
         count[k]++
         if (!(k in order)) { order[k] = ++seq; klist[seq] = k }
+        # A folder name alone says nothing when it stands for one file, so
+        # carry a couple of real names. Relative to the folder already shown,
+        # so the row does not repeat itself.
+        if (count[k] <= EX) {
+          rel = (g == "(root)") ? path[i] : substr(path[i], length(g) + 2)
+          ex[k] = (count[k] == 1) ? rel : ex[k] SEP rel
+        }
       }
 
       out = ""
@@ -260,7 +271,14 @@ pending_json() {
         one = "{" q("label") ":" q(f[1])
         one = one "," q("side") ":" q(f[2])
         one = one "," q("folder") ":" q(f[3])
-        one = one "," q("count") ":" count[klist[i]] "}"
+        one = one "," q("count") ":" count[klist[i]]
+        one = one "," q("examples") ":["
+        m = split(ex[klist[i]], e, SEP)
+        for (j = 1; j <= m; j++) {
+          if (j > 1) one = one ","
+          one = one q(e[j])
+        }
+        one = one "]}"
         if (i > 1) out = out ","
         out = out one
       }
