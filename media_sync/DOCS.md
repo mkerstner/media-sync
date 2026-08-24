@@ -136,6 +136,25 @@ nothing to rescan.
 Everything else is the same: both directions, newest wins, test runs, include
 and exclude rules, deletion protection, and the folder-by-folder review.
 
+### If a WebDAV sync is slow
+
+WebDAV has no way to ask for a whole tree at once, so a share is listed one
+folder at a time. That makes scanning a matter of round trips rather than
+bandwidth, and the things that help are the ones that reduce or overlap them:
+
+- **Parallel WebDAV requests**, under Advanced, decides how many of those
+  round trips happen at once. It defaults to 16. Raising it is usually the
+  single most effective change; lower it if the server struggles.
+- **Exclude what you do not sync.** Anything not excluded is walked in full,
+  every run, even if nothing in it ever changes.
+- **Point the pair at a smaller folder**, or use the include list, rather than
+  pairing with the root of a large share.
+- **Sync one direction at a time** while you are measuring. Each direction
+  walks the tree independently.
+- On the Nextcloud side, a single folder holding many thousands of entries is
+  slow to list no matter what this app does. Splitting it up helps more than
+  any setting here.
+
 ## Settings
 
 The options screen is grouped into sections. In YAML the same grouping applies,

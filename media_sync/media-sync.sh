@@ -61,6 +61,12 @@ WEBDAV_URL="${WEBDAV_URL:-}"
 WEBDAV_USER="${WEBDAV_USER:-}"
 WEBDAV_PASS="${WEBDAV_PASS:-}"
 
+# How many WebDAV requests run at once. A share has to be listed one directory
+# at a time - the protocol has no recursive form - so this is latency-bound and
+# raising it helps more than anything else here. It also loads the server, so
+# it is a setting rather than a constant.
+WEBDAV_PARALLEL="${WEBDAV_PARALLEL:-16}"
+
 MEDIA_DIR="${MEDIA_DIR:-/media}"
 
 # --- what to synchronise ----------------------------------------------------
@@ -498,7 +504,7 @@ RSYNC_BASE="-a -u --partial --human-readable --modify-window=1"
 
 # --update is rclone's equivalent of rsync -u: never replace a destination
 # file that is newer. Run both ways, that is the same newest-wins merge.
-RCLONE_BASE="--update --checkers 8 --transfers 4"
+RCLONE_BASE="--update --checkers $WEBDAV_PARALLEL --transfers 4"
 
 # Without these a dead connection is indistinguishable from a slow one, and
 # the run waits for ever rather than failing with something to read.
@@ -627,8 +633,11 @@ scan_deletes() {   # $1 = source, $2 = destination
 # Copy exactly the paths listed in a file, and nothing else.
 transport_copy_files() {   # $1 = source, $2 = destination, $3 = list file
   if [ "$PROTOCOL" = "webdav" ]; then
-    rclone copy $RCLONE_BASE --files-from "$3" "$1" "$2" \
-        < /dev/null 2>&1
+    # --no-traverse: the list says exactly which files to move, so listing the
+    # destination to find that out again is the whole cost of the operation
+    # for nothing.
+    rclone copy $RCLONE_BASE $RCLONE_NET --no-traverse --files-from "$3" \
+        "$1" "$2" < /dev/null 2>&1
   else
     rsync $RSYNC_BASE --files-from="$3" -e "$RSH" "$1" "$2" \
         < /dev/null 2>&1

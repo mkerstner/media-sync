@@ -125,6 +125,13 @@ configuration:
           files lists what moved, changes also says what was different about
           each file, and progress adds a live percentage. The higher settings
           fill the log faster.
+      webdav_parallel:
+        name: Parallel WebDAV requests
+        description: >-
+          How many requests to a WebDAV share run at once. A share has to be
+          listed one folder at a time, so this is the setting that decides how
+          quickly a large one is scanned. Raise it if scans are slow, lower it
+          if your server struggles. Ignored when connecting over SSH.
       log_keep_days:
         name: Keep log entries for
         description: >-

@@ -1,5 +1,5 @@
 name: Media Sync
-version: "1.7.7"
+version: "1.8.0"
 slug: media_sync
 url: https://github.com/mkerstner/media-sync/tree/main/media_sync
 description: Two-way sync between your media library and a remote server over an encrypted connection - from the UI, an automation or a terminal
@@ -71,6 +71,7 @@ options:
     log_level: info
     sync_log_verbosity: summary
     log_keep_days: 14
+    webdav_parallel: 16
 schema:
   source:
     protocol: list(ssh|webdav)
@@ -99,3 +100,4 @@ schema:
     log_level: list(trace|debug|info|notice|warning|error|fatal)
     sync_log_verbosity: list(quiet|summary|files|changes|progress|debug)
     log_keep_days: int(1,365)
+    webdav_parallel: int(1,64)

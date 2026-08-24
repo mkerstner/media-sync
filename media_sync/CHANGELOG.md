@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.8.0
+
+- New Advanced setting **Parallel WebDAV requests**, default 16. A share has
+  to be listed one folder at a time, so scanning is a matter of round trips
+  rather than bandwidth, and running more of them at once is the most
+  effective thing available. The old fixed value was 8.
+- Copying a confirmed list of files over WebDAV no longer lists the
+  destination first. The list already says exactly what to move, so that
+  listing was the whole cost of the operation for nothing.
+
 ## 1.7.7
 
 - Removed the `Config file not found - using defaults` notice from every
