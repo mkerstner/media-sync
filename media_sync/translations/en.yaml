@@ -26,9 +26,10 @@ configuration:
       webdav_url:
         name: WebDAV address
         description: >-
-          The full WebDAV address. Nextcloud shows it at the bottom of its
-          Files page, and it looks like
-          https://cloud.example.com/remote.php/dav/files/USERNAME/
+          The address of your Nextcloud, such as https://cloud.example.com.
+          The app works out the rest from the username below. Pasting the full
+          address that Nextcloud shows at the bottom of its Files page works
+          just as well.
       webdav_user:
         name: WebDAV username
         description: The account name on that server.

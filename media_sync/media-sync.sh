@@ -444,14 +444,18 @@ case "$PROTOCOL" in
       *) die "the WebDAV address must start with https:// (got: $WEBDAV_URL)" ;;
     esac
 
-    # The nextcloud vendor requires the files endpoint. Nextcloud also shows an
-    # older /remote.php/webdav/ address that looks equally plausible and does
-    # not work here, so say which one is wanted rather than leaving rclone to
-    # complain once per folder pair.
+    # The nextcloud vendor needs the files endpoint, which is always
+    # <address>/remote.php/dav/files/<user>. Both halves are already known, so
+    # build it rather than making someone paste a URL the app can derive. The
+    # older /remote.php/webdav address is the same base with the wrong tail.
     case "${WEBDAV_URL%/}" in
       */dav/files/*) ;;
       *)
-        die "the WebDAV address must end in /remote.php/dav/files/YOURNAME - Nextcloud shows it at the bottom of its Files page (got: $WEBDAV_URL)"
+        _base="${WEBDAV_URL%/}"
+        _base="${_base%/remote.php/webdav}"
+        _base="${_base%/remote.php}"
+        WEBDAV_URL="$_base/remote.php/dav/files/$WEBDAV_USER/"
+        log "NOTE: using the WebDAV address $WEBDAV_URL"
         ;;
     esac
 

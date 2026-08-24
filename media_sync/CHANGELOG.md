@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.7.3
+
+- The WebDAV address can now be just your Nextcloud address, such as
+  `https://cloud.example.com`. The endpoint is always
+  `<address>/remote.php/dav/files/<user>` and the app knows both halves, so
+  it builds the rest and logs what it used. A full address still works, as
+  does the older `/remote.php/webdav` one, which is the same base with the
+  wrong tail.
+
 ## 1.7.2
 
 - A WebDAV address that is not the files endpoint is now refused at the start

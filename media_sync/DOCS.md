@@ -82,12 +82,16 @@ That is a real difference from SSH, and worth knowing before you choose it.
 
 Set **How to connect** to WebDAV and fill in three fields.
 
-**WebDAV address.** Nextcloud prints it at the bottom left of its Files page.
-It looks like:
+**WebDAV address.** The address of your Nextcloud is enough:
 
 ```
-https://cloud.example.com/remote.php/dav/files/YOURNAME/
+https://cloud.example.com
 ```
+
+The endpoint is always `<address>/remote.php/dav/files/<user>`, and the app
+knows both halves, so it fills in the rest and says in the log what it used.
+Pasting the full address that Nextcloud prints at the bottom left of its Files
+page works just as well.
 
 Use `https://`, never `http://`.
 
