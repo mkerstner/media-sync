@@ -186,6 +186,9 @@ log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*"; }
 
 STARTED="$(now_iso)"
 FINISHED=0
+# Set when a pair got through with some items failing. The run still counts as
+# failed at the end, but it finishes first.
+RUN_HAD_ERRORS=0
 LAST_SUCCESS=""
 
 # ---- state file ------------------------------------------------------------
@@ -351,7 +354,7 @@ die() {
 cleanup() {
   [ "$FINISHED" -eq 0 ] && write_state failed "interrupted"
   [ "${LOCK_HELD:-0}" -eq 1 ] && rmdir "$LOCK_DIR" 2>/dev/null
-  rm -f "$FILTER_FILE" "$PENDING_FILE" "$RCLONE_CONF" 2>/dev/null
+  rm -f "$FILTER_FILE" "$PENDING_FILE" "$RCLONE_CONF" /tmp/media-sync.errs.$$ 2>/dev/null
   true
 }
 LOCK_HELD=0
@@ -848,6 +851,11 @@ sync_one_way() {
 
   # Raw output stays in $_rsync_out, so the leftover check below still reads
   # rsync's own wording. Only what reaches the log is rewritten.
+  # rclone reports a failed item as "ERROR : path: reason", rsync as
+  # "rsync: ...". Either way these are the items, not the run.
+  _errs="/tmp/media-sync.errs.$"
+  grep -E '^[0-9/]+ [0-9:]+ ERROR : |^rsync: ' "$_rsync_out" > "$_errs" 2>/dev/null || : > "$_errs"
+
   tally "$label" "$_rsync_out"
 
   # rsync leaves a folder behind when excluded files are still inside it.
@@ -871,8 +879,26 @@ sync_one_way() {
 
   if [ "$_status" -ne 0 ]; then
     if [ "$PROTOCOL" = "webdav" ]; then _tool=rclone; else _tool=rsync; fi
-    die "[$label] $_tool failed (exit $_status)"
+    # A failure that names the items it could not handle is not the same as
+    # one that could not start. Aborting on the first meant a single
+    # unreadable path stopped every other file, and every later folder pair,
+    # from syncing at all.
+    _failed=0
+    if [ -s "$_errs" ]; then
+      _failed="$(wc -l < "$_errs" | tr -d ' ')"
+    fi
+    if [ "$_failed" -gt 0 ]; then
+      RUN_HAD_ERRORS=1
+      log "[$label] $_failed item(s) could not be transferred:"
+      head -n 10 "$_errs" | sed 's/^/      /'
+      [ "$_failed" -gt 10 ] && log "      ... and $(( _failed - 10 )) more"
+      log "[$label] the rest of this pair went through - the run will be reported as failed"
+    else
+      rm -f "$_errs"
+      die "[$label] $_tool failed (exit $_status)"
+    fi
   fi
+  rm -f "$_errs"
 }
 
 # ---- applying review decisions ---------------------------------------------
@@ -1053,9 +1079,13 @@ done <<EOF
 $SYNC_PAIRS
 EOF
 
-[ "$MODE" = "sync" ] && LAST_SUCCESS="$(now_iso)"
+[ "$MODE" = "sync" ] && [ "$RUN_HAD_ERRORS" -eq 0 ] && LAST_SUCCESS="$(now_iso)"
 FINISHED=1
-write_state ok ""
+if [ "$RUN_HAD_ERRORS" -eq 1 ]; then
+  write_state failed "some items could not be transferred - see the log"
+else
+  write_state ok ""
+fi
 
 # Close every run with what was found, so the outcome is readable without
 # scrolling back through the whole run or opening the report file.

@@ -136,6 +136,25 @@ nothing to rescan.
 Everything else is the same: both directions, newest wins, test runs, include
 and exclude rules, deletion protection, and the folder-by-folder review.
 
+### When some items cannot be transferred
+
+A run that fails on individual items now finishes the rest of them, names what
+it could not handle, and reports the run as failed at the end. One unreadable
+path used to stop every other file, and every later folder pair, from syncing
+at all.
+
+The most common cause with Nextcloud is a filename in the wrong Unicode form.
+A name typed on a Mac or stored on a Synology uses NFD, where the umlaut in
+`Übungen` is a plain U followed by a combining mark; Nextcloud and Linux use
+NFC, where it is a single character. They look identical and are different
+bytes, and Nextcloud does not consistently reach files stored the first way.
+
+That is a problem in the files themselves, not something this app can work
+around: the server answers with a path it will not then accept. The fix is to
+normalise the names on the Nextcloud side, for example with `convmv -r -f
+utf-8 -t utf-8 --nfc` over the data directory followed by
+`occ files:scan --all`. Try it on one folder first, and have a backup.
+
 ### If a WebDAV sync is slow
 
 WebDAV has no way to ask for a whole tree at once, so a share is listed one

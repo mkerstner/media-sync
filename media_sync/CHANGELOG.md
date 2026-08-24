@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.9.0
+
+- A run that fails on individual items now finishes the rest of them. It names
+  what it could not handle, carries on to the remaining folder pairs, and
+  reports the run as failed at the end. Until now the first unreadable path
+  stopped everything, so one file could block a whole library.
+- A failure that cannot name any item - a wrong address, a refused login -
+  still ends the run immediately, because there is nothing to carry on with.
+- The last successful sync is no longer recorded when items failed.
+
 ## 1.8.2
 
 - Added `.DAV/` to the default excludes. WebDAV clients leave that folder
