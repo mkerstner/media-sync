@@ -79,14 +79,20 @@ if ! cmp -s /media-sync.sh "${SCRIPT_COPY}"; then
   log_line "app" "refreshed ${SCRIPT_COPY}"
 fi
 
-if ! bashio::fs.file_exists "${KEY_FILE}"; then
-  bashio::log.warning "No SSH key yet, generating one at ${KEY_FILE}"
-  ssh-keygen -t ed25519 -N "" -f "${KEY_FILE}" -C "media-sync" >/dev/null
-  bashio::log.warning "Install this public key on the remote server, then start the app again:"
-  bashio::log.warning "$(cat "${KEY_FILE}.pub")"
-  log_line "app" "generated a new SSH key at ${KEY_FILE}"
+export PROTOCOL="$(bashio::config 'source.protocol')"
+
+# The SSH key is only meaningful for the ssh transport. Generating one for a
+# WebDAV setup would print a key nobody has anywhere to put.
+if [ "${PROTOCOL}" = "ssh" ]; then
+  if ! bashio::fs.file_exists "${KEY_FILE}"; then
+    bashio::log.warning "No SSH key yet, generating one at ${KEY_FILE}"
+    ssh-keygen -t ed25519 -N "" -f "${KEY_FILE}" -C "media-sync" >/dev/null
+    bashio::log.warning "Install this public key on the remote server, then start the app again:"
+    bashio::log.warning "$(cat "${KEY_FILE}.pub")"
+    log_line "app" "generated a new SSH key at ${KEY_FILE}"
+  fi
+  chmod 600 "${KEY_FILE}"
 fi
-chmod 600 "${KEY_FILE}"
 
 export VERBOSITY="$(bashio::config 'advanced.sync_log_verbosity')"
 export REMOTE_HOST="$(bashio::config 'source.remote_host')"
@@ -94,6 +100,9 @@ export REMOTE_USER="$(bashio::config 'source.remote_user')"
 export REMOTE_PORT="$(bashio::config 'source.remote_port')"
 export REMOTE_BASE="$(bashio::config 'source.remote_base')"
 export REMOTE_KEY="${KEY_FILE}"
+export WEBDAV_URL="$(bashio::config 'source.webdav_url')"
+export WEBDAV_USER="$(bashio::config 'source.webdav_user')"
+export WEBDAV_PASS="$(bashio::config 'source.webdav_pass')"
 export KNOWN_HOSTS="${KEY_DIR}/known_hosts"
 export STATE_FILE="${STATE_DIR}/state.json"
 export DELETE_REPORT="${STATE_DIR}/deletions.txt"

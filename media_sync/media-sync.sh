@@ -54,6 +54,13 @@ REMOTE_HOST="${REMOTE_HOST:-}"
 REMOTE_PORT="${REMOTE_PORT:-22}"
 REMOTE_BASE="${REMOTE_BASE:-}"
 
+# How to reach the remote side: "ssh" drives rsync over SSH, "webdav" drives
+# rclone against a WebDAV share such as Nextcloud.
+PROTOCOL="${PROTOCOL:-ssh}"
+WEBDAV_URL="${WEBDAV_URL:-}"
+WEBDAV_USER="${WEBDAV_USER:-}"
+WEBDAV_PASS="${WEBDAV_PASS:-}"
+
 MEDIA_DIR="${MEDIA_DIR:-/media}"
 
 # --- what to synchronise ----------------------------------------------------
@@ -399,30 +406,70 @@ fi
 
 write_state running ""
 
-[ -n "$REMOTE_HOST" ] || die "no remote server configured (REMOTE_HOST is empty)"
-[ -n "$REMOTE_USER" ] || die "no remote user configured (REMOTE_USER is empty)"
-[ -f "$REMOTE_KEY" ] || die "missing $REMOTE_KEY"
-remotekey="$(private_copy "$REMOTE_KEY")"
-RSH="ssh -p $REMOTE_PORT -i $remotekey $SSH_OPTS"
+# ---- transport selection ---------------------------------------------------
+# Everything below this point works in terms of REMOTE_PREFIX and the
+# transport_* functions, so the sync, review and resolve logic is the same
+# whichever protocol is in use.
+case "$PROTOCOL" in
+  ssh)
+    [ -n "$REMOTE_HOST" ] || die "no remote server configured (REMOTE_HOST is empty)"
+    [ -n "$REMOTE_USER" ] || die "no remote user configured (REMOTE_USER is empty)"
+    [ -f "$REMOTE_KEY" ] || die "missing $REMOTE_KEY"
+    remotekey="$(private_copy "$REMOTE_KEY")"
+    RSH="ssh -p $REMOTE_PORT -i $remotekey $SSH_OPTS"
+    REMOTE_PREFIX="$REMOTE_USER@$REMOTE_HOST:"
+    ;;
+  webdav)
+    command -v rclone >/dev/null 2>&1 || die "rclone is not installed in this image"
+    [ -n "$WEBDAV_URL" ]  || die "no WebDAV address configured (WEBDAV_URL is empty)"
+    [ -n "$WEBDAV_USER" ] || die "no WebDAV user configured (WEBDAV_USER is empty)"
+    [ -n "$WEBDAV_PASS" ] || die "no WebDAV password configured (WEBDAV_PASS is empty)"
+    # Configure the backend through the environment: rclone writes no config
+    # file this way, so the credential never lands in a file of ours. Obscuring
+    # is what rclone expects of a stored password, and reading it from stdin
+    # keeps the plaintext off the command line. rclone obscures the hyphen
+    # itself when stdin is empty, which the check above rules out.
+    RCLONE_CONFIG_DAV_TYPE=webdav
+    RCLONE_CONFIG_DAV_VENDOR=nextcloud
+    RCLONE_CONFIG_DAV_URL="$WEBDAV_URL"
+    RCLONE_CONFIG_DAV_USER="$WEBDAV_USER"
+    RCLONE_CONFIG_DAV_PASS="$(printf '%s\n' "$WEBDAV_PASS" | rclone obscure -)"
+    export RCLONE_CONFIG_DAV_TYPE RCLONE_CONFIG_DAV_VENDOR RCLONE_CONFIG_DAV_URL
+    export RCLONE_CONFIG_DAV_USER RCLONE_CONFIG_DAV_PASS
+    RSH=""
+    REMOTE_PREFIX="dav:"
+    ;;
+  *)
+    die "unknown protocol: $PROTOCOL (expected ssh or webdav)"
+    ;;
+esac
 
 # -a  : recursive, preserves times/perms -> transfers only what changed
 # -u  : never overwrite a destination file that is newer than the source
 # Run in both directions, this yields newest-wins per file.
 RSYNC_BASE="-a -u --partial --human-readable --modify-window=1"
 
+# --update is rclone's equivalent of rsync -u: never replace a destination
+# file that is newer. Run both ways, that is the same newest-wins merge.
+RCLONE_BASE="--update --checkers 8 --transfers 4"
+
 if [ "$DRY_RUN" -eq 1 ]; then
   RSYNC_OUT="--dry-run --itemize-changes --stats"
+  RCLONE_OUT="--dry-run -v"
 else
   case "$VERBOSITY" in
-    quiet)    RSYNC_OUT="--info=stats0" ;;
-    files)    RSYNC_OUT="-v --info=stats2" ;;
-    changes)  RSYNC_OUT="-v --itemize-changes --info=stats2" ;;
+    quiet)    RSYNC_OUT="--info=stats0";                    RCLONE_OUT="-q" ;;
+    files)    RSYNC_OUT="-v --info=stats2";                 RCLONE_OUT="-v" ;;
+    changes)  RSYNC_OUT="-v --itemize-changes --info=stats2"; RCLONE_OUT="-v" ;;
     # A per-file progress bar only makes sense on a terminal. Anywhere else
     # use the single aggregate line, so a log stays readable.
     progress) if [ -t 1 ]; then RSYNC_OUT="-v --progress --info=stats2"
-              else                RSYNC_OUT="-v --info=progress2,stats2"; fi ;;
-    debug)    RSYNC_OUT="-vv --itemize-changes --info=progress2,stats2" ;;
-    *)        RSYNC_OUT="--info=stats2" ;;
+                                RCLONE_OUT="-v --progress"
+              else                RSYNC_OUT="-v --info=progress2,stats2"
+                                RCLONE_OUT="-v --stats 15s"; fi ;;
+    debug)    RSYNC_OUT="-vv --itemize-changes --info=progress2,stats2"
+              RCLONE_OUT="-vv" ;;
+    *)        RSYNC_OUT="--info=stats2";                    RCLONE_OUT="" ;;
   esac
 fi
 
@@ -446,10 +493,75 @@ build_filter() {   # $1 = comma-separated excludes for this pair
 
 # ---- deletion handling -----------------------------------------------------
 # Lists what --delete *would* remove from the destination, without doing it.
-scan_deletes() {
-  rsync $RSYNC_BASE --dry-run --delete --itemize-changes "$FILTER_OPT" \
-      -e "$RSH" "$1" "$2" < /dev/null 2>/dev/null \
-    | sed -n 's/^\*deleting  *//p'
+# ---- transport operations --------------------------------------------------
+# Four things the sync needs from a protocol. Everything above and below is
+# shared: grouping, the review, decisions and the state file do not care how
+# bytes move.
+
+# Paths present in the destination but not in the source. These are the
+# deletion candidates the review asks about.
+# Move the files themselves. A non-empty $3 means deletions were confirmed,
+# which is rclone's "sync" rather than "copy".
+transport_sync() {   # $1 = source, $2 = destination, $3 = delete option
+  if [ "$PROTOCOL" = "webdav" ]; then
+    if [ -n "$3" ]; then _verb=sync; else _verb=copy; fi
+    # The filter file is written in rsync syntax. rclone reads the same
+    # leading "+" and "-" and the same ** wildcard, which covers what
+    # build_filter emits; anything more exotic would need translating.
+    rclone $_verb $RCLONE_BASE $RCLONE_OUT --filter-from "$FILTER_FILE" \
+        "$1" "$2" < /dev/null 2>&1
+  else
+    rsync $RSYNC_BASE $RSYNC_OUT $3 "$FILTER_OPT" -e "$RSH" "$1" "$2" \
+        < /dev/null 2>&1
+  fi
+}
+
+scan_deletes() {   # $1 = source, $2 = destination
+  if [ "$PROTOCOL" = "webdav" ]; then
+    # --missing-on-src is exactly this question, so there is no output format
+    # to parse. --size-only keeps it from hashing a whole library to answer a
+    # question about which names exist.
+    rclone check "$1" "$2" --size-only --missing-on-src - \
+        --filter-from "$FILTER_FILE" < /dev/null 2>/dev/null
+  else
+    rsync $RSYNC_BASE --dry-run --delete --itemize-changes "$FILTER_OPT" \
+        -e "$RSH" "$1" "$2" < /dev/null 2>/dev/null \
+      | sed -n 's/^\*deleting  *//p'
+  fi
+}
+
+# Copy exactly the paths listed in a file, and nothing else.
+transport_copy_files() {   # $1 = source, $2 = destination, $3 = list file
+  if [ "$PROTOCOL" = "webdav" ]; then
+    rclone copy $RCLONE_BASE --files-from "$3" "$1" "$2" \
+        < /dev/null 2>&1
+  else
+    rsync $RSYNC_BASE --files-from="$3" -e "$RSH" "$1" "$2" \
+        < /dev/null 2>&1
+  fi
+}
+
+# Remove one recorded path from whichever side still holds it.
+# Remove one recorded path from whichever side still holds it. Dispatch is on
+# the shape of the root, not the protocol, so a local destination is handled
+# the same way under either.
+transport_remove_path() {   # $1 = root, $2 = path relative to it
+  case "$1" in
+    dav:*)
+      # deletefile removes a single file, purge a directory and its contents.
+      # Which one this path is is not known here, so try the file first.
+      rclone deletefile "$1$2" < /dev/null 2>/dev/null \
+        || rclone purge "$1$2" < /dev/null 2>/dev/null
+      ;;
+    *:*)
+      _host="${1%%:*}"
+      _path="${1#*:}"
+      $RSH "$_host" "rm -rf -- $(shell_quote "${_path}$2")" < /dev/null
+      ;;
+    *)
+      rm -rf -- "$1$2"
+      ;;
+  esac
 }
 
 # Record deletion candidates for review. Written as TSV so the review UI can
@@ -494,19 +606,11 @@ remove_leftover() {   # $1 = destination root, $2 = path relative to it
   esac
 
   case "$_root" in
-    *:*)
-      _host="${_root%%:*}"
-      _path="${_root#*:}"
-      log "[$label] removing leftover on the server: $_rel"
-      $RSH "$_host" "rm -rf -- $(shell_quote "${_path}${_rel}")" </dev/null \
-        || log "[$label] could not remove $_rel on the server"
-      ;;
-    *)
-      log "[$label] removing leftover: $_rel"
-      rm -rf -- "${_root}${_rel}" \
-        || log "[$label] could not remove $_rel"
-      ;;
+    *:*) log "[$label] removing leftover on the server: $_rel" ;;
+    *)   log "[$label] removing leftover: $_rel" ;;
   esac
+  transport_remove_path "$_root" "$_rel" \
+    || log "[$label] could not remove $_rel"
 }
 
 # ---- readable output -------------------------------------------------------
@@ -629,8 +733,7 @@ sync_one_way() {
   _rsync_out="/tmp/media-sync.out.$$"
   _rsync_rc="/tmp/media-sync.rc.$$"
   {
-    rsync $RSYNC_BASE $RSYNC_OUT $del_opt "$FILTER_OPT" -e "$RSH" "$src" "$dst" \
-      < /dev/null 2>&1
+    transport_sync "$src" "$dst" "$del_opt"
     echo $? > "$_rsync_rc"
   } | tee "$_rsync_out" | humanize
   _status="$(cat "$_rsync_rc" 2>/dev/null || echo 1)"
@@ -753,8 +856,7 @@ resolve_decisions() {
       log "[$label] keeping $_n item(s) - copying to the other side"
       if [ "$DRY_RUN" -eq 1 ]; then
         log "[$label] dry run - nothing copied"
-      elif rsync $RSYNC_BASE --files-from="$_keep" -e "$RSH" \
-             "$_holder" "$_other" < /dev/null 2>&1 | humanize; then
+      elif transport_copy_files "$_holder" "$_other" "$_keep" | humanize; then
         awk -v l="$label" 'BEGIN{T=sprintf("%c",9)} {print l T $0}' "$_keep" >> "$_acted"
       else
         log "[$label] could not copy the kept items"
@@ -827,7 +929,7 @@ while IFS='|' read -r name rsub lloc pair_excl; do
     *)    rpath="${REMOTE_BASE:+$REMOTE_BASE/}${rsub%/}/" ;;
   esac
   lpath="${lloc%/}/"
-  remote="$REMOTE_USER@$REMOTE_HOST:$rpath"
+  remote="${REMOTE_PREFIX}${rpath}"
 
   build_filter "$pair_excl"
   [ "$MODE" = "sync" ] && mkdir -p "$lpath"

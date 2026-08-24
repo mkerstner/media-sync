@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.7.0
+
+- The remote side can now be a **WebDAV share**, which is how to reach
+  Nextcloud. Set **How to connect** to WebDAV and give it the address, a
+  username and an app password.
+- Existing setups are untouched. **How to connect** defaults to SSH and
+  nothing else changed for it.
+- Reaching Nextcloud over WebDAV goes through Nextcloud itself, so it sees
+  every change as it happens. Copying files into its storage directly needs
+  an `occ files:scan` afterwards; this does not.
+- WebDAV stores a password, unlike SSH. Use an app password rather than your
+  account password. The app writes it to no file of its own, and the
+  documentation is explicit about where it does live.
+- **Remove leftover folders** has no effect over WebDAV. It exists for an
+  rsync rule that does not apply there.
+
 ## 1.6.0
 
 - Each review row now carries the first couple of filenames it stands for.

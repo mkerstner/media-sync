@@ -15,9 +15,11 @@
 
 ---
 
-Works with any server you can reach over SSH — a NAS, a VPS, a rented storage
-box. Everything travels over an encrypted SSH connection, using a key the app
-creates for itself, so there is no password to store.
+Works with a NAS, a VPS or a rented storage box over SSH, and with Nextcloud
+or anything else that speaks WebDAV. Everything travels encrypted.
+Over SSH the app uses a key it creates for itself, so there is no password to
+store. WebDAV needs one, and the documentation covers keeping that to a
+revocable app password.
 
 This repository holds the **Media Sync app**, which does the actual syncing.
 Its companion, the

@@ -28,7 +28,10 @@ kick off by hand still shows up in Home Assistant.
 
 ## Is it secure?
 
-Everything travels over SSH — the same encrypted connection SFTP and SCP use.
+Everything travels over an encrypted connection, whichever protocol you pick:
+SSH, the same one SFTP and SCP use, or HTTPS for WebDAV.
+
+### Over SSH
 
 - **Your files are encrypted on the way.** Nothing is sent in the clear between
   Home Assistant and the remote server.
@@ -44,6 +47,24 @@ Everything travels over SSH — the same encrypted connection SFTP and SCP use.
 - **Password login is switched off** for these connections, so a run can never
   quietly fall back to something weaker, or sit there waiting on a prompt.
 
+### Over WebDAV
+
+WebDAV has no equivalent of a key pair, so this one **does** store a password.
+That is a real difference from SSH, and worth knowing before you choose it.
+
+- **Use an app password, never your account password.** In Nextcloud, create
+  one under **Settings, Security, Create new app password**. It can be revoked
+  on its own without changing your login, and it keeps working when two-factor
+  authentication is on.
+- **Use an https:// address.** WebDAV over plain http would send the password
+  and your files in the clear.
+- **The app writes the password to no file of its own.** It is handed to the
+  transfer tool through the environment, in the obscured form that tool
+  expects, so it appears in no command line and no config file. It does live in
+  the app settings, which the Supervisor stores, and that is the honest limit
+  of this.
+- **It never reaches the logs** or a diagnostics download.
+
 ## Setup
 
 1. Go to **Settings → Apps → ⋮ → Repositories** and add
@@ -56,6 +77,53 @@ Everything travels over SSH — the same encrypted connection SFTP and SCP use.
    without a password. On most servers you append it to `~/.ssh/authorized_keys`.
 5. Fill in the settings below, then install the **Media Sync** integration to
    get buttons, status and the deletion confirmation.
+
+## Connecting to Nextcloud, or any WebDAV share
+
+Set **How to connect** to WebDAV and fill in three fields.
+
+**WebDAV address.** Nextcloud prints it at the bottom left of its Files page.
+It looks like:
+
+```
+https://cloud.example.com/remote.php/dav/files/YOURNAME/
+```
+
+Use `https://`, never `http://`.
+
+**WebDAV username.** Your account name on that server.
+
+**WebDAV password.** Create an app password rather than using your account
+password: **Settings, Security, Create new app password**. Nextcloud shows it
+once, so copy it straight into the app. An app password can be revoked on its
+own, and it keeps working with two-factor login.
+
+The folder pairs work exactly as they do over SSH: the remote side of each pair
+is counted from **Base folder**, which for Nextcloud is relative to the root of
+your Files.
+
+### Why this is the right way to reach Nextcloud
+
+Syncing files into Nextcloud's storage directly, behind its back, leaves its
+database unaware of them until someone runs `occ files:scan`. WebDAV goes
+through Nextcloud itself, so it sees every change as it happens. There is
+nothing to rescan.
+
+### What differs from SSH
+
+- **Remove leftover folders** does nothing. It exists because rsync refuses to
+  delete a directory that still holds excluded files; WebDAV transfers have no
+  such rule.
+- **Per-file log lines look different.** The plain-word rendering described
+  under Logs applies to the SSH transport. WebDAV runs report in the transfer
+  tool's own wording, which is already readable, and the end-of-run counts are
+  not produced.
+- **Large uploads.** Nextcloud chunks uploads at 10 MiB by default. If you move
+  large video files regularly, raising that on the Nextcloud side improves
+  throughput. That is a Nextcloud setting, not one this app can change.
+
+Everything else is the same: both directions, newest wins, test runs, include
+and exclude rules, deletion protection, and the folder-by-folder review.
 
 ## Settings
 
