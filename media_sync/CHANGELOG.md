@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.7.6
+
+- Fixed **Skip within this pair** and the global exclude list being ignored
+  over WebDAV. The settings are written the way rsync reads them, where
+  excluding `Anna` excludes the folder and everything in it. rclone reads a
+  bare name as a file pattern, so those lines matched nothing and the folders
+  synced anyway. Each pattern is now written in both forms.
+- An include list over WebDAV blocked less than it should have, for the same
+  reason.
+
 ## 1.7.5
 
 - A WebDAV run no longer looks frozen while it works. Listing a share takes

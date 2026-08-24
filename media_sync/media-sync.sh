@@ -522,6 +522,14 @@ fi
 build_filter() {   # $1 = comma-separated excludes for this pair
   : > "$FILTER_FILE"
 
+  if [ "$PROTOCOL" = "webdav" ]; then
+    _rclone_filter "$1"
+  else
+    _rsync_filter "$1"
+  fi
+}
+
+_rsync_filter() {   # $1 = comma-separated excludes for this pair
   clean_list "$(printf '%s' "$1" | tr ',' '\n')" | sed 's/^/- /' >> "$FILTER_FILE"
   clean_list "$EXCLUDE_PATTERNS" | sed 's/^/- /' >> "$FILTER_FILE"
 
@@ -531,6 +539,32 @@ build_filter() {   # $1 = comma-separated excludes for this pair
       printf '+ /%s/\n+ /%s/**\n' "$d" "$d"
     done >> "$FILTER_FILE"
     echo '- /*' >> "$FILTER_FILE"          # block everything not whitelisted
+  fi
+}
+
+# The settings are written in rsync's vocabulary, where excluding "Anna"
+# excludes the folder and everything inside it. rclone reads the same leading
+# "+" and "-" but treats a bare name as a *file* pattern, so the same line
+# silently matches nothing and the folder syncs anyway. Every pattern is
+# therefore emitted twice: once as itself, once as its contents.
+_rclone_filter() {   # $1 = comma-separated excludes for this pair
+  {
+    clean_list "$(printf '%s' "$1" | tr ',' '\n')"
+    clean_list "$EXCLUDE_PATTERNS"
+  } | while IFS= read -r _p; do
+        _b="${_p%/}"
+        [ -n "$_b" ] || continue
+        printf -- '- %s\n' "$_b"
+        printf -- '- %s/**\n' "$_b"
+      done >> "$FILTER_FILE"
+
+  _inc="$(clean_list "$INCLUDE_DIRS")"
+  if [ -n "$_inc" ]; then
+    printf '%s\n' "$_inc" | sed 's#^/##; s#/*$##' | while IFS= read -r d; do
+      printf -- '+ /%s/**\n' "$d"
+    done >> "$FILTER_FILE"
+    # "- *" only covers the top level in rclone's syntax; "- **" is everything.
+    echo '- **' >> "$FILTER_FILE"
   fi
 }
 
@@ -548,9 +582,6 @@ build_filter() {   # $1 = comma-separated excludes for this pair
 transport_sync() {   # $1 = source, $2 = destination, $3 = delete option
   if [ "$PROTOCOL" = "webdav" ]; then
     if [ -n "$3" ]; then _verb=sync; else _verb=copy; fi
-    # The filter file is written in rsync syntax. rclone reads the same
-    # leading "+" and "-" and the same ** wildcard, which covers what
-    # build_filter emits; anything more exotic would need translating.
     rclone $_verb $RCLONE_BASE $RCLONE_NET $RCLONE_OUT \
         --filter-from "$FILTER_FILE" "$1" "$2" < /dev/null 2>&1
   else
