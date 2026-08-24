@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.7.2
+
+- A WebDAV address that is not the files endpoint is now refused at the start
+  of the run, naming the address it wants. Nextcloud also shows an older
+  `/remote.php/webdav/` address that looks equally plausible and does not
+  work, and rclone only said so once per folder pair.
+- **Base folder** over WebDAV is a path inside the share, not a path on the
+  server disk. A leading slash is stripped and the log says what was used.
+- Every run now prints the remote each folder pair resolved to, so a wrong
+  base folder is visible rather than something to infer from a failure.
+- An address that is not https is refused; plain http is warned about.
+- A failed transfer named rsync even when rclone was doing the work.
+
 ## 1.7.1
 
 - Fixed WebDAV runs failing immediately with exit 1 and no explanation. The

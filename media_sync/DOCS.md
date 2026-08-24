@@ -98,9 +98,16 @@ password: **Settings, Security, Create new app password**. Nextcloud shows it
 once, so copy it straight into the app. An app password can be revoked on its
 own, and it keeps working with two-factor login.
 
-The folder pairs work exactly as they do over SSH: the remote side of each pair
-is counted from **Base folder**, which for Nextcloud is relative to the root of
-your Files.
+The folder pairs work exactly as they do over SSH, with one difference worth
+being deliberate about: **Base folder** is a path *inside the share*, not a
+path on the server disk. Over SSH it might be `/home/data/nas`; over WebDAV
+that same setting means a folder called `home/data/nas` in your Nextcloud
+Files. Usually it should be empty, or the name of one folder.
+
+A leading slash is meaningless here, so the app strips it and says in the log
+what it settled on. Every run also prints the remote each pair resolved to, so
+a wrong base folder shows up as a line you can read rather than a failure you
+have to interpret.
 
 ### Why this is the right way to reach Nextcloud
 

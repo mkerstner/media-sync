@@ -436,6 +436,37 @@ case "$PROTOCOL" in
     RCLONE_CONFIG_DAV_PASS="$(printf '%s\n' "$WEBDAV_PASS" | rclone obscure -)"
     export RCLONE_CONFIG_DAV_TYPE RCLONE_CONFIG_DAV_VENDOR RCLONE_CONFIG_DAV_URL
     export RCLONE_CONFIG_DAV_USER RCLONE_CONFIG_DAV_PASS
+    case "$WEBDAV_URL" in
+      http://*)
+        log "WARNING: the WebDAV address is http, so the password and your files travel in the clear"
+        ;;
+      https://*) ;;
+      *) die "the WebDAV address must start with https:// (got: $WEBDAV_URL)" ;;
+    esac
+
+    # The nextcloud vendor requires the files endpoint. Nextcloud also shows an
+    # older /remote.php/webdav/ address that looks equally plausible and does
+    # not work here, so say which one is wanted rather than leaving rclone to
+    # complain once per folder pair.
+    case "${WEBDAV_URL%/}" in
+      */dav/files/*) ;;
+      *)
+        die "the WebDAV address must end in /remote.php/dav/files/YOURNAME - Nextcloud shows it at the bottom of its Files page (got: $WEBDAV_URL)"
+        ;;
+    esac
+
+    # Over WebDAV the base folder is a path inside the share, not a path on the
+    # server's disk. A leading slash is meaningless there and usually means the
+    # setting was carried over from an SSH setup.
+    case "$REMOTE_BASE" in
+      /*)
+        _was="$REMOTE_BASE"
+        REMOTE_BASE="${REMOTE_BASE#/}"
+        REMOTE_BASE="${REMOTE_BASE%/}"
+        log "NOTE: the base folder is counted from the WebDAV share, not the server's disk - reading \"$_was\" as \"$REMOTE_BASE\""
+        ;;
+    esac
+
     RSH=""
     REMOTE_PREFIX="dav:"
     ;;
@@ -769,7 +800,10 @@ sync_one_way() {
   fi
   rm -f "$_rsync_out"
 
-  [ "$_status" -eq 0 ] || die "[$label] rsync failed (exit $_status)"
+  if [ "$_status" -ne 0 ]; then
+    if [ "$PROTOCOL" = "webdav" ]; then _tool=rclone; else _tool=rsync; fi
+    die "[$label] $_tool failed (exit $_status)"
+  fi
 }
 
 # ---- applying review decisions ---------------------------------------------
@@ -937,6 +971,7 @@ while IFS='|' read -r name rsub lloc pair_excl; do
   esac
   lpath="${lloc%/}/"
   remote="${REMOTE_PREFIX}${rpath}"
+  log "[$name] remote is $remote"
 
   build_filter "$pair_excl"
   [ "$MODE" = "sync" ] && mkdir -p "$lpath"
