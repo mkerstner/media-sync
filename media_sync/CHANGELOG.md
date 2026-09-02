@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.9.3
+
+- Reverted the change in 1.9.2, which was wrong. `file not in <somewhere>`
+  is not a failure: rclone logs it for every file that is on one side and not
+  the other, which is exactly what the delete scan is looking for. Treating
+  those as unreadable folders held back every deletion candidate there was,
+  so the review would have shown almost nothing. 1.9.1 already covers the
+  real case, where a folder cannot be listed at all.
+- Those lines no longer reach the log either. There is one per difference,
+  thousands on a first run, and each says what the candidate list already
+  says while reading like something went wrong.
+
 ## 1.9.2
 
 - Widened the guard added in 1.9.1. It recognised a folder the server could
