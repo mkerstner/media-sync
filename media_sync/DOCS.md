@@ -136,6 +136,22 @@ nothing to rescan.
 Everything else is the same: both directions, newest wins, test runs, include
 and exclude rules, deletion protection, and the folder-by-folder review.
 
+### "Errors" during the scan are not errors
+
+While the scan runs, the progress line reports an error count that climbs into
+the thousands, with the words "retrying may help". Neither is what it sounds
+like.
+
+The tool underneath counts every file that exists on one side and not the
+other as an error, because that is how it signals "the two are not identical"
+to whatever called it. So the number is the count of one-sided items found,
+which is the answer the scan was asked for. On a first run, or after a lot of
+deleting, it is meant to be large.
+
+What the run then does with those items is decided by the review, not by that
+counter. A real failure looks different: it names a folder and says it could
+not be read, and that message is not filtered out.
+
 ### When some items cannot be transferred
 
 A run that fails on individual items now finishes the rest of them, names what

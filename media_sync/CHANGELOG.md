@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.9.4
+
+- The scan reports progress on one line instead of a five-line block every
+  thirty seconds.
+- Documented the error count that appears while scanning. The tool underneath
+  counts every one-sided file as an error, so the number is the count of items
+  found rather than a sign of trouble, and "retrying may help" does not apply
+  to it.
+
 ## 1.9.3
 
 - Reverted the change in 1.9.2, which was wrong. `file not in <somewhere>`
