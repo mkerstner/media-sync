@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.9.1
+
+- A folder that cannot be read is no longer treated as an empty one. Listing
+  it fails, everything inside it is reported as missing from the other side,
+  and the review then offered those files for deletion - files that are on the
+  server the whole time. The folders rclone or rsync could not read are now
+  named in the log, and nothing inside them is proposed for deletion until
+  they can be read again.
+- The re-check that runs before a confirmed deletion applies the same rule, so
+  a decision made earlier cannot delete through a folder that has since become
+  unreadable.
+- Fixed applying review decisions over WebDAV. The remote side was addressed
+  as `user@host:` there as well, which is an SSH address, so keeping or
+  deleting a reviewed item could not find the server.
+
 ## 1.9.0
 
 - A run that fails on individual items now finishes the rest of them. It names

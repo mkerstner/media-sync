@@ -138,6 +138,11 @@ MAX_GROUPS="${MAX_GROUPS:-40}"
 LOCK_DIR="${LOCK_DIR:-/tmp/media-sync.lock}"
 FILTER_FILE="/tmp/media-sync.filter.$$"
 PENDING_FILE="/tmp/media-sync.pending.$$"
+# Folders the delete scan could not read. A folder that cannot be listed looks
+# exactly like an empty one, so everything inside it appears to be missing.
+# The scan runs inside a command substitution and so cannot pass a variable
+# back to its caller - it leaves the folders here instead.
+UNREADABLE_FILE="/tmp/media-sync.unreadable.$$"
 # rclone announces a missing config file on every invocation. The backend is
 # configured through the environment on purpose, so there is nothing to put in
 # one - but an empty file it can find is quieter than a notice per command.
@@ -354,7 +359,8 @@ die() {
 cleanup() {
   [ "$FINISHED" -eq 0 ] && write_state failed "interrupted"
   [ "${LOCK_HELD:-0}" -eq 1 ] && rmdir "$LOCK_DIR" 2>/dev/null
-  rm -f "$FILTER_FILE" "$PENDING_FILE" "$RCLONE_CONF" /tmp/media-sync.errs.$$ 2>/dev/null
+  rm -f "$FILTER_FILE" "$PENDING_FILE" "$RCLONE_CONF" "$UNREADABLE_FILE" \
+        /tmp/media-sync.errs.$$ 2>/dev/null
   true
 }
 LOCK_HELD=0
@@ -610,7 +616,15 @@ transport_sync() {   # $1 = source, $2 = destination, $3 = delete option
   fi
 }
 
+# A folder that could not be read is indistinguishable from an empty one, so
+# everything inside it comes back as "missing on the source". Those are not
+# deletion candidates, they are unknowns, and offering them would propose
+# deleting files that are present on the other side after all. rclone's own
+# sync refuses to delete when a listing failed; this path reaches deletion
+# through "check" and "deletefile" instead, so it has to refuse for itself.
 scan_deletes() {   # $1 = source, $2 = destination
+  : > "$UNREADABLE_FILE"
+
   if [ "$PROTOCOL" = "webdav" ]; then
     # --missing-on-src is exactly this question, so there is no output format
     # to parse. --size-only keeps it from hashing a whole library to answer a
@@ -622,17 +636,58 @@ scan_deletes() {   # $1 = source, $2 = destination
     # a command substitution, so letting it through ends the run under set -e
     # before anything has been logged. A connection that genuinely fails still
     # surfaces at the transfer step.
-    # stderr is deliberately not discarded here. Listing a WebDAV share takes
-    # one request per directory, so this can run for minutes on a large tree,
-    # and the candidate paths go to stdout - leaving stderr alone is what
-    # turns a silent wait into progress and a real error into a message.
+    #
+    # The candidates go to stdout and everything else to stderr, so the two
+    # are split here rather than merged: the errors have to be read before the
+    # answer can be trusted, while progress still reaches the log. Listing a
+    # WebDAV share takes one request per directory, so a large tree can run
+    # for minutes with nothing to show otherwise.
+    _scan_out="/tmp/media-sync.scan.$$"
+    _scan_err="/tmp/media-sync.scanerr.$$"
     rclone check "$1" "$2" --size-only --missing-on-src - \
         --filter-from "$FILTER_FILE" $RCLONE_NET --stats 30s \
-        --stats-log-level NOTICE < /dev/null || true
+        --stats-log-level NOTICE < /dev/null 2>&1 >"$_scan_out" \
+      | tee "$_scan_err" >&2 || true
+
+    # "<date> <time> ERROR : <path>: error reading source directory: <reason>"
+    sed -n \
+      -e 's/^[^ ]* [^ ]* ERROR : \(.*\): error reading source directory: .*$/\1/p' \
+      -e 's/^[^ ]* [^ ]* ERROR : \(.*\): error reading destination directory: .*$/\1/p' \
+      "$_scan_err" | sort -u > "$UNREADABLE_FILE"
+
+    if [ -s "$UNREADABLE_FILE" ]; then
+      # Drop the unreadable folders and everything below them. Compared by
+      # length rather than by pattern, so a name holding regex punctuation is
+      # matched as the literal text it is.
+      awk '
+        NR == FNR { if ($0 != "") dirs[++n] = $0; next }
+        {
+          for (i = 1; i <= n; i++)
+            if ($0 == dirs[i] || substr($0, 1, length(dirs[i]) + 1) == dirs[i] "/")
+              next
+          print
+        }
+      ' "$UNREADABLE_FILE" "$_scan_out"
+    else
+      cat "$_scan_out"
+    fi
+    rm -f "$_scan_out" "$_scan_err"
   else
+    # rsync names the folder it could not open in its own message, in terms of
+    # the source root rather than of the pair, so there is no reliable way to
+    # match it against the candidate paths. Hold back the whole list for this
+    # pair instead of guessing which part of it is trustworthy.
+    _scan_out="/tmp/media-sync.scan.$$"
+    _scan_err="/tmp/media-sync.scanerr.$$"
     rsync $RSYNC_BASE --dry-run --delete --itemize-changes "$FILTER_OPT" \
-        -e "$RSH" "$1" "$2" < /dev/null 2>/dev/null \
-      | sed -n 's/^\*deleting  *//p'
+        -e "$RSH" "$1" "$2" < /dev/null 2>"$_scan_err" \
+      | sed -n 's/^\*deleting  *//p' > "$_scan_out" || true
+
+    grep -E '^rsync:.*(opendir|change_dir|readdir)' "$_scan_err" \
+      > "$UNREADABLE_FILE" 2>/dev/null || : > "$UNREADABLE_FILE"
+
+    [ -s "$UNREADABLE_FILE" ] || cat "$_scan_out"
+    rm -f "$_scan_out" "$_scan_err"
   fi
 }
 
@@ -809,6 +864,16 @@ sync_one_way() {
   if [ "$CHECK_DELETES" -eq 1 ]; then
     log "[$label] looking for items that exist on one side only..."
     dels="$(scan_deletes "$src" "$dst")"
+
+    if [ -s "$UNREADABLE_FILE" ]; then
+      RUN_HAD_ERRORS=1
+      _bad="$(wc -l < "$UNREADABLE_FILE" | tr -d ' ')"
+      log "[$label] $_bad folder(s) could not be read, so what is inside them is unknown:"
+      head -n 10 "$UNREADABLE_FILE" | sed 's/^/      /'
+      [ "$_bad" -gt 10 ] && log "      ... and $(( _bad - 10 )) more"
+      log "[$label] nothing inside them is offered for deletion until they can be read"
+    fi
+
     if [ -n "$dels" ]; then
       count="$(printf '%s\n' "$dels" | wc -l | tr -d ' ')"
       log "[$label] $count item(s) present in the destination but not the source:"
@@ -853,7 +918,7 @@ sync_one_way() {
   # rsync's own wording. Only what reaches the log is rewritten.
   # rclone reports a failed item as "ERROR : path: reason", rsync as
   # "rsync: ...". Either way these are the items, not the run.
-  _errs="/tmp/media-sync.errs.$"
+  _errs="/tmp/media-sync.errs.$$"
   grep -E '^[0-9/]+ [0-9:]+ ERROR : |^rsync: ' "$_rsync_out" > "$_errs" 2>/dev/null || : > "$_errs"
 
   tally "$label" "$_rsync_out"
@@ -919,7 +984,7 @@ pair_paths() {   # $1 = pair name
       .|"") _rp="${REMOTE_BASE:+$REMOTE_BASE/}" ;;
       *)    _rp="${REMOTE_BASE:+$REMOTE_BASE/}${_rsub%/}/" ;;
     esac
-    printf '%s@%s:%s\t%s\n' "$REMOTE_USER" "$REMOTE_HOST" "$_rp" "${_lloc%/}/"
+    printf '%s\t%s\n' "${REMOTE_PREFIX}${_rp}" "${_lloc%/}/"
     return 0
   done <<PAIRS
 $SYNC_PAIRS
@@ -1008,6 +1073,9 @@ resolve_decisions() {
       log "[$label] $_n item(s) marked for deletion - re-checking before removing"
       _still="/tmp/media-sync.still.$$"
       scan_deletes "$_other" "$_holder" > "$_still" 2>/dev/null || : > "$_still"
+      if [ -s "$UNREADABLE_FILE" ]; then
+        log "[$label] $(wc -l < "$UNREADABLE_FILE" | tr -d ' ') folder(s) could not be read on the other side - anything inside them stays"
+      fi
       _go="/tmp/media-sync.go.$$"
       awk 'NR==FNR { want[$0]=1; next } ($0 in want)' "$_del" "$_still" > "$_go"
       _skipped=$(( _n - $(wc -l < "$_go" | tr -d ' ') ))
