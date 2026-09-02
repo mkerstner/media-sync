@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.9.2
+
+- Widened the guard added in 1.9.1. It recognised a folder the server could
+  not list, but not the other shape the same problem takes: the server names
+  an item and then refuses to resolve it, once per item, with `file not in
+  webdav root`. Those items were still being offered for deletion.
+- The folder holding an unresolvable item is now held back as a whole,
+  including items it did not complain about, because a listing that went
+  wrong part way cannot be trusted for the rest of it.
+- An unresolvable name directly at a pair root no longer holds back the
+  entire pair.
+
 ## 1.9.1
 
 - A folder that cannot be read is no longer treated as an empty one. Listing

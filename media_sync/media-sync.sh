@@ -649,11 +649,26 @@ scan_deletes() {   # $1 = source, $2 = destination
         --stats-log-level NOTICE < /dev/null 2>&1 >"$_scan_out" \
       | tee "$_scan_err" >&2 || true
 
-    # "<date> <time> ERROR : <path>: error reading source directory: <reason>"
-    sed -n \
-      -e 's/^[^ ]* [^ ]* ERROR : \(.*\): error reading source directory: .*$/\1/p' \
-      -e 's/^[^ ]* [^ ]* ERROR : \(.*\): error reading destination directory: .*$/\1/p' \
-      "$_scan_err" | sort -u > "$UNREADABLE_FILE"
+    # Two shapes, both meaning "this folder was not read properly".
+    #
+    #   ERROR : <folder>: error reading source directory: <reason>
+    #   ERROR : <file>: file not in webdav root '<root>'
+    #
+    # The first names the folder outright. The second is what a Unicode
+    # mismatch looks like: the server lists a name and then will not accept it
+    # back, once per item. Those items are not missing, they are unresolvable,
+    # and the folder holding them cannot be trusted to have listed the rest
+    # either - so the folder is what gets held back.
+    {
+      sed -n \
+        -e 's/^[^ ]* [^ ]* ERROR : \(.*\): error reading source directory: .*$/\1/p' \
+        -e 's/^[^ ]* [^ ]* ERROR : \(.*\): error reading destination directory: .*$/\1/p' \
+        "$_scan_err"
+      # Take the folder, not the item. The match requires a slash, so an
+      # unresolvable name at the pair root cannot hold back the entire pair.
+      sed -n 's/^[^ ]* [^ ]* ERROR : \(.*\): file not in webdav root .*$/\1/p' \
+        "$_scan_err" | sed -n 's#^\(.*\)/[^/]*$#\1#p'
+    } | sort -u > "$UNREADABLE_FILE"
 
     if [ -s "$UNREADABLE_FILE" ]; then
       # Drop the unreadable folders and everything below them. Compared by
@@ -872,6 +887,7 @@ sync_one_way() {
       head -n 10 "$UNREADABLE_FILE" | sed 's/^/      /'
       [ "$_bad" -gt 10 ] && log "      ... and $(( _bad - 10 )) more"
       log "[$label] nothing inside them is offered for deletion until they can be read"
+      log "[$label] items there may be present on the other side - a failed listing cannot tell you which"
     fi
 
     if [ -n "$dels" ]; then
