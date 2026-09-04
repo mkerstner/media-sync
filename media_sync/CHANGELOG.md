@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.2
+
+- Brought the documentation on scan progress up to date. It described an error
+  count climbing into the thousands and explained why not to worry about it -
+  but that line has been filtered out of the log since 1.9.4, so it described
+  something no longer visible. It now describes the line that is: the check
+  count, and what its two numbers mean.
+
 ## 2.0.1
 
 - A skipped folder pair now says when it last synced:

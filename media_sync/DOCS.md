@@ -163,21 +163,30 @@ nothing to rescan.
 Everything else is the same: both directions, newest wins, test runs, include
 and exclude rules, deletion protection, and the folder-by-folder review.
 
-### "Errors" during the scan are not errors
+### What the scan reports while it runs
 
-While the scan runs, the progress line reports an error count that climbs into
-the thousands, with the words "retrying may help". Neither is what it sounds
-like.
+A WebDAV scan has to ask the server about one folder at a time, so on a large
+share it runs for a while. Every thirty seconds it prints where it has got to:
 
-The tool underneath counts every file that exists on one side and not the
-other as an error, because that is how it signals "the two are not identical"
-to whatever called it. So the number is the count of one-sided items found,
-which is the answer the scan was asked for. On a first run, or after a lot of
-deleting, it is meant to be large.
+```
+Checks:              5114 / 5114, 100%, Listed 11963
+```
 
-What the run then does with those items is decided by the review, not by that
-counter. A real failure looks different: it names a folder and says it could
-not be read, and that message is not filtered out.
+**Checks** is how many items have been compared, **Listed** how many the server
+has named so far. Both climb until the scan finishes. Nothing is transferred
+while scanning, so there is no byte counter.
+
+Two things the underlying tool also reports are left out of the log, because
+neither means what it says. It counts every file that exists on one side and
+not the other as an error - that is how it signals "these two are not
+identical" to whatever called it - and prints one such line per item, plus a
+running total, plus the words "retrying may help". On a first run that total
+reaches the thousands, and every one of those items is the answer the scan was
+asked for rather than a problem with it. They are already on their way to the
+review.
+
+A real failure is not filtered. It names a folder and says it could not be
+read, and it is worth reading.
 
 ### When some items cannot be transferred
 
