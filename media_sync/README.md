@@ -38,4 +38,4 @@ which adds buttons, status and the deletion confirmation to Home Assistant.
 
 Everything travels encrypted whichever you pick: SSH, or HTTPS for WebDAV.
 
-See [DOCS.md](DOCS.md) for setup and settings.
+Setup and settings are on the **Documentation** tab.

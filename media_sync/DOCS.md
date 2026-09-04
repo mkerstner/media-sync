@@ -494,6 +494,63 @@ safely.
 The full candidate list lives in `/config/media_sync/pending.tsv`, and your
 decisions arrive as `/config/media_sync/decisions.tsv`. Both are plain text.
 
+## Two schedules worth having
+
+Most setups want two different things from a schedule, and they are best kept
+separate.
+
+### Little and often
+
+A check every few minutes, to pick up whatever has just changed.
+
+With **Skip folders that have not changed** on, a check that finds nothing to
+do costs one question to the server rather than a walk of the whole share, so a
+short interval is affordable in a way it was not before. Set it under the
+integration's **Configure** screen - *Run a check every 5 minutes* - and leave
+the direction on pull if you mainly consume what the server holds.
+
+Watch the **Last run duration** sensor for the first few. If a check regularly
+takes longer than the gap between checks, the interval is too short for the
+size of the share.
+
+### Big and rare
+
+A full comparison once a day, to catch anything the quick check could not see.
+
+The quick check trusts the server when it says a folder has not changed. That
+is almost always right, and there is one case where it is not: if the storage
+behind a WebDAV share is written to directly - by something other than
+Nextcloud - the server may not know, and will keep saying nothing has changed.
+A run with `--full` ignores that answer and compares everything.
+
+```yaml
+automation:
+  - alias: "Full media sync overnight"
+    triggers:
+      - trigger: time
+        at: "03:30:00"
+    actions:
+      - action: media_sync.sync
+        data:
+          config_entry: 01JQ8ZK4M7WXYZ0123456789AB
+          direction: both
+          full: true
+```
+
+Expect it to take as long as a first run, because that is what it is doing.
+Overnight is the right slot for it.
+
+### Which to use
+
+| | Quick check | Full sync |
+| --- | --- | --- |
+| How often | Every few minutes | Daily, or weekly |
+| Costs | One request when nothing changed | A full walk, every time |
+| Notices | Anything Nextcloud knows about | Everything, including changes made behind Nextcloud's back |
+
+Running both is the point: the frequent one keeps things current, the rare one
+makes sure the frequent one has not been quietly missing something.
+
 ## How the two halves talk
 
 The app does one run and stops. The integration leaves the options for the next

@@ -30,6 +30,8 @@ usage: media-sync.sh [options]
       --push-only         local -> remote only
       --yes               assume "yes" to delete confirmations (DANGEROUS)
       --no-delete-check   do not look for things to delete (faster)
+      --full              compare everything, even folders the server says
+                          have not changed
       --resolve           apply the keep/delete decisions recorded by Home
                           Assistant, then exit
       --force-removal     remove a confirmed folder even when excluded files
@@ -171,6 +173,7 @@ for arg in "$@"; do
     --yes)             ASSUME_YES=1;    FWD="$FWD --yes" ;;
     --no-delete-check) CHECK_DELETES=0; FWD="$FWD --no-delete-check" ;;
     --force-removal)   FORCE_REMOVAL=1; FWD="$FWD --force-removal" ;;
+    --full)            SKIP_UNCHANGED=0; FWD="$FWD --full" ;;
     --resolve)         RESOLVE=1;       FWD="$FWD --resolve" ;;
     -q|--quiet)        VERBOSITY=quiet;    FWD="$FWD --quiet" ;;
     -v|--verbose)      VERBOSITY=files;    FWD="$FWD --verbose" ;;

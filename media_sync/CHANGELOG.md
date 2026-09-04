@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.1.0
+
+- New `--full` option, which compares everything even where the server says
+  nothing has changed. The quick check takes the server at its word, which is
+  right except when the storage behind a WebDAV share is written to directly:
+  Nextcloud does not always know, and will go on saying nothing has changed.
+- Documented the two schedules worth running together - a check every few
+  minutes, which is now cheap enough to be sensible, and a full comparison
+  once a day to catch what the quick one cannot see.
+- Fixed the link to the settings on the Info tab, which pointed at a file
+  rather than the Documentation tab and so went nowhere.
+
 ## 2.0.2
 
 - Brought the documentation on scan progress up to date. It described an error
