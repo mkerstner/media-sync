@@ -101,6 +101,7 @@ if bashio::config.true 'advanced.skip_unchanged'; then
 else
   export SKIP_UNCHANGED=0
 fi
+export CHANGE_DEPTH="$(bashio::config 'advanced.change_depth')"
 export REMOTE_HOST="$(bashio::config 'ssh.host')"
 export REMOTE_USER="$(bashio::config 'ssh.user')"
 export REMOTE_PORT="$(bashio::config 'ssh.port')"

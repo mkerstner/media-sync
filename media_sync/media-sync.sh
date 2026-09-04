@@ -74,6 +74,12 @@ WEBDAV_PARALLEL="${WEBDAV_PARALLEL:-16}"
 # the whole tree one directory at a time.
 SKIP_UNCHANGED="${SKIP_UNCHANGED:-1}"
 
+# How far to follow the change check down the folder tree before giving up and
+# taking a whole subtree. 0 is all-or-nothing at the pair root. Each level
+# costs a request per changed folder at that level, and narrows what has to be
+# compared afterwards.
+CHANGE_DEPTH="${CHANGE_DEPTH:-2}"
+
 MEDIA_DIR="${MEDIA_DIR:-/media}"
 
 # --- what to synchronise ----------------------------------------------------
@@ -1065,6 +1071,218 @@ record_pair_state() {   # $1 = label, $2 = remote path
   [ -n "$_now" ] || return 0
   mkdir -p "$STATE_DIR"
   printf '%s\n' "$_now" > "$(pair_stamp "$1")"
+  seed_pair_dirs "$1" "$2"
+}
+
+TAB="$(printf '\t')"
+
+# Where a pair's per-folder tags are remembered: "path<tab>tag" per folder.
+pair_dirs() {   # $1 = pair label
+  printf '%s/.dirs-%s' "$STATE_DIR" "$(printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '_')"
+}
+
+# One folder's immediate children: "isdir<tab>raw<tab>tag<tab>name".
+#
+# The name is empty when the raw form holds anything outside plain ASCII. awk
+# cannot be relied on to rebuild a multi-byte character identically on every
+# implementation, and a name rebuilt wrongly would name the wrong folder. An
+# empty name is treated as "changed" by the caller, so such a folder is synced
+# rather than guessed at.
+propfind_children() {   # $1 = path below the WebDAV root
+  _b="${WEBDAV_URL#*://}"
+  _b="/${_b#*/}"
+  curl -sS -u "$WEBDAV_USER:$WEBDAV_PASS" -X PROPFIND -H 'Depth: 1' \
+      --max-time 60 \
+      --data '<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:getetag/><d:resourcetype/></d:prop></d:propfind>' \
+      "${WEBDAV_URL%/}/$1" 2>/dev/null \
+    | awk -v prefix="${_b%/}/$1" '
+        BEGIN { QT = sprintf("%c", 34) }
+        function hex2dec(h,   d, i, c, v) {
+          d = 0
+          for (i = 1; i <= length(h); i++) {
+            c = tolower(substr(h, i, 1))
+            v = index("0123456789abcdef", c) - 1
+            if (v < 0) return -1
+            d = d * 16 + v
+          }
+          return d
+        }
+        function urldecode(s,   out, i, c, n) {
+          out = ""
+          i = 1
+          while (i <= length(s)) {
+            c = substr(s, i, 1)
+            if (c == "%") {
+              if (i + 2 > length(s)) return ""
+              n = hex2dec(substr(s, i + 1, 2))
+              if (n < 32 || n > 126) return ""
+              out = out sprintf("%c", n)
+              i = i + 3
+            } else {
+              out = out c
+              i = i + 1
+            }
+          }
+          return out
+        }
+        function field(block, name,   v) {
+          if (!match(block, "<[a-zA-Z0-9]*:*" name ">[^<]*")) return ""
+          v = substr(block, RSTART, RLENGTH)
+          sub("^<[a-zA-Z0-9]*:*" name ">", "", v)
+          return v
+        }
+        { buf = buf $0 }
+        END {
+          n = split(buf, part, "</[a-zA-Z0-9]*:*response>")
+          for (i = 1; i <= n; i++) {
+            href = field(part[i], "href")
+            if (href == "") continue
+            etag = field(part[i], "getetag")
+            gsub("&quot;", "", etag)
+            gsub(QT, "", etag)
+            isdir = (part[i] ~ "<[a-zA-Z0-9]*:*collection[ ]*/>") ? 1 : 0
+            if (substr(href, 1, length(prefix)) != prefix) continue
+            rest = substr(href, length(prefix) + 1)
+            sub("/$", "", rest)
+            if (rest == "") continue
+            if (index(rest, "/") > 0) continue
+            printf "%d\t%s\t%s\t%s\n", isdir, rest, etag, urldecode(rest)
+          }
+        }
+      '
+}
+
+# Fold what was just seen into what was remembered, keeping entries for folders
+# this run had no reason to visit. Replacing the file outright would make every
+# unvisited folder look new next time, which is the opposite of the point.
+merge_dirs() {   # $1 = seen file, $2 = store
+  [ -s "$1" ] || return 0
+  _tmp="$2.new"
+  awk -F "$TAB" '
+    NR == FNR { fresh[$1] = $0; next }
+    !($1 in fresh) { print }
+    END { for (k in fresh) print fresh[k] }
+  ' "$1" "$2" > "$_tmp" 2>/dev/null && mv "$_tmp" "$2"
+  rm -f "$_tmp"
+}
+
+# Filter lines limiting a run to the folders that changed, or nothing at all
+# when that cannot be worked out - in which case the caller does the full scan
+# it would have done anyway.
+changed_filter() {   # $1 = label, $2 = pair root below the WebDAV root
+  [ "$PROTOCOL" = "webdav" ] || return 1
+  [ "$CHANGE_DEPTH" -gt 0 ] || return 1
+  command -v curl >/dev/null 2>&1 || return 1
+  # An include list is already a whitelist. Combining two is a good way to
+  # sync the wrong thing, so the descent stands aside.
+  [ -z "$(clean_list "$INCLUDE_DIRS")" ] || return 1
+
+  _known="$(pair_dirs "$1")"
+  [ -s "$_known" ] || return 1
+
+  _seen="/tmp/media-sync.seen.$"
+  _inc="/tmp/media-sync.inc.$"
+  _level="/tmp/media-sync.level.$"
+  _next="/tmp/media-sync.next.$"
+  : > "$_seen"; : > "$_inc"; : > "$_next"
+  printf '\n' > "$_level"
+
+  _depth="$CHANGE_DEPTH"
+  while [ "$_depth" -gt 0 ] && [ -s "$_level" ]; do
+    : > "$_next"
+    while IFS= read -r _p; do
+      _kids="$(propfind_children "$2$_p")"
+      if [ -z "$_kids" ]; then
+        printf -- '+ /%s**\n' "$_p" >> "$_inc"
+        continue
+      fi
+
+      # This folder's own tag moved, and a file sitting directly in it may be
+      # the reason.
+      printf -- '+ /%s*\n' "$_p" >> "$_inc"
+
+      # A child that was remembered and is no longer listed has been removed.
+      # Take the subtree rather than work out which one it was.
+      _before="$(awk -F "$TAB" -v p="$_p" '
+        substr($1, 1, length(p)) == p && index(substr($1, length(p) + 1), "/") == 0 { c++ }
+        END { print c + 0 }' "$_known")"
+      _nowc="$(printf '%s\n' "$_kids" | wc -l | tr -d ' ')"
+      if [ "$_before" -gt "$_nowc" ]; then
+        printf -- '+ /%s**\n' "$_p" >> "$_inc"
+        continue
+      fi
+
+      printf '%s\n' "$_kids" | while IFS="$TAB" read -r _isdir _raw _tag _name; do
+        [ -n "$_raw" ] || continue
+        _path="$_p$_raw"
+        printf '%s\t%s\n' "$_path" "$_tag" >> "$_seen"
+        [ "$_isdir" = "1" ] || continue
+
+        _was="$(awk -F "$TAB" -v k="$_path" '$1 == k { print $2; exit }' "$_known")"
+        [ "$_was" = "$_tag" ] && continue
+
+        if [ "$_depth" -gt 1 ] && [ -n "$_name" ]; then
+          printf '%s%s/\n' "$_p" "$_name" >> "$_next"
+        else
+          printf -- '+ /%s%s/**\n' "$_p" "${_name:-$_raw}" >> "$_inc"
+        fi
+      done
+    done < "$_level"
+    mv "$_next" "$_level"
+    _depth=$(( _depth - 1 ))
+  done
+
+  # Whatever the descent still held when it ran out of depth.
+  while IFS= read -r _p; do
+    [ -n "$_p" ] || continue
+    printf -- '+ /%s**\n' "$_p" >> "$_inc"
+  done < "$_level"
+
+  rm -f "$_level" "$_next"
+
+  if [ ! -s "$_inc" ]; then
+    rm -f "$_inc" "$_seen"
+    return 1
+  fi
+
+  # Every folder on the way to an included one has to be traversable.
+  awk '
+    {
+      print
+      if (substr($0, 1, 3) != "+ /") next
+      path = substr($0, 4)
+      n = split(path, seg, "/")
+      acc = ""
+      for (i = 1; i < n; i++) {
+        if (seg[i] == "") continue
+        acc = acc seg[i] "/"
+        print "+ /" acc
+      }
+    }
+  ' "$_inc" | sort -u
+
+  merge_dirs "$_seen" "$_known"
+  rm -f "$_inc" "$_seen"
+  return 0
+}
+
+# Remember the top level of a pair, so a later run has something to compare
+# against. Deeper levels fill in as the descent visits them; until they do they
+# read as changed, which costs a wider sync and never a missed one.
+seed_pair_dirs() {   # $1 = label, $2 = pair root
+  [ "$PROTOCOL" = "webdav" ] || return 0
+  [ "$CHANGE_DEPTH" -gt 0 ] || return 0
+  command -v curl >/dev/null 2>&1 || return 0
+
+  _kids="$(propfind_children "$2")"
+  [ -n "$_kids" ] || return 0
+  _seed="/tmp/media-sync.seed.$"
+  printf '%s\n' "$_kids" | awk -F "$TAB" '$2 != "" { print $2 "\t" $3 }' > "$_seed"
+  mkdir -p "$STATE_DIR"
+  _store="$(pair_dirs "$1")"
+  [ -f "$_store" ] || : > "$_store"
+  merge_dirs "$_seed" "$_store"
+  rm -f "$_seed"
 }
 
 # ---- applying review decisions ---------------------------------------------
@@ -1242,10 +1460,20 @@ while IFS='|' read -r name rsub lloc pair_excl; do
 
   # Deletions are resolved per direction *before* the merge: once both sides
   # have been merged, nothing looks deleted any more.
+  # Nothing changed at all is decided first, and costs one request.
   if pair_unchanged "$name" "$rpath" "$lpath"; then
     _when="$(stamp_time "$(pair_stamp "$name")" || true)"
     log "[$name] nothing has changed on either side since the last sync${_when:+ at $_when} - skipped"
     continue
+  fi
+
+  # Something changed. Work out how much of the tree that actually covers, so
+  # the comparison is limited to it rather than to everything.
+  if _narrow="$(changed_filter "$name" "$rpath")" && [ -n "$_narrow" ]; then
+    printf '%s\n' "$_narrow" >> "$FILTER_FILE"
+    printf -- '- **\n' >> "$FILTER_FILE"
+    _folders="$(printf '%s\n' "$_narrow" | grep -c -- '/[*][*]$' || true)"
+    log "[$name] $_folders folder(s) changed - comparing only those"
   fi
 
   if [ "$DO_PULL" -eq 1 ]; then sync_one_way "$name pull" "$remote" "$lpath"; fi

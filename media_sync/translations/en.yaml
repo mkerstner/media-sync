@@ -156,6 +156,15 @@ configuration:
           seconds. Anything uncertain counts as changed, so the worst case is
           the full scan you would have had anyway. Ignored over SSH, where
           listing is already cheap.
+      change_depth:
+        name: How deep to look for changes
+        description: >-
+          When something has changed, how far down the folder tree to narrow it
+          before giving up and comparing a whole branch. 0 compares everything
+          as soon as anything changes. 1 narrows to the top-level folder that
+          changed, 2 to the one below that, and so on. Each level costs one
+          request per changed folder and saves comparing everything that did
+          not. Ignored over SSH.
       log_keep_days:
         name: Keep log entries for
         description: >-

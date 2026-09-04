@@ -231,6 +231,22 @@ bandwidth, and the things that help are the ones that reduce or overlap them:
   full scan, so the cost of being wrong is a slow run rather than a missed
   one.
 
+- **How deep to look for changes**, under Advanced, decides what happens once
+  something *has* changed. At 0 the whole pair is compared, however small the
+  change was. At 1 the folders below the pair root are asked individually and
+  only the ones that moved are compared; at 2 the level below that, and so on.
+  The default is 2.
+
+  Each level costs one request per changed folder at that level, and saves
+  comparing everything that did not change. On a share where one folder gets
+  edited and the rest sit still, this is the difference between comparing one
+  folder and comparing all of them.
+
+  Deeper is not automatically better: each level asks more questions, and past
+  a point asking costs more than looking. Anything it cannot work out - a name
+  it will not risk decoding, a folder that vanished, an answer it did not
+  expect - falls back to comparing that branch in full.
+
 - **Parallel WebDAV requests**, under Advanced, decides how many of those
   round trips happen at once. It defaults to 16.
 

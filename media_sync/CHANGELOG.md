@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.2.0
+
+- New Advanced setting **How deep to look for changes**, default 2. Until now,
+  anything changing anywhere meant comparing the whole pair. The check now
+  follows the change down the tree and compares only the folders that actually
+  moved - so editing one file under one folder no longer means walking all the
+  others.
+- 0 keeps the old all-or-nothing behaviour. 1 narrows to the top-level folder,
+  2 to the one below it, up to 10.
+- Anything it cannot work out falls back to comparing that branch in full: a
+  folder whose name cannot be decoded safely, a folder that has disappeared, an
+  answer that did not look as expected. Being wrong costs a wider comparison,
+  never a missed change.
+
 ## 2.1.0
 
 - New `--full` option, which compares everything even where the server says
