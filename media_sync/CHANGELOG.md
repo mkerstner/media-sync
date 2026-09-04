@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.3.1
+
+Applying a review of several hundred deletions took about an hour.
+
+- **The list is now removed in one operation instead of one per file.** Each
+  item had its own rclone or ssh invocation, which paid for process start,
+  connection and authentication before it could send a single request - around
+  five seconds each, whatever the server did. 695 items took an hour that the
+  same server clears in a couple of minutes.
+- The log says how many are going and names the first ten, rather than printing
+  a line per file.
+- If the removal reports errors, nothing from that batch is recorded as done,
+  so those items stay in the review and can be tried again. Anything that did
+  go is dropped from the list by the re-check on the next run, so retrying
+  costs nothing.
+
 ## 2.3.0
 
 Deleting files on the Home Assistant side was never reported, and in "both"

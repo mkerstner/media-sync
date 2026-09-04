@@ -391,6 +391,7 @@ cleanup() {
   [ "${LOCK_HELD:-0}" -eq 1 ] && rmdir "$LOCK_DIR" 2>/dev/null
   rm -f "$FILTER_FILE" "$PENDING_FILE" "$RCLONE_CONF" "$UNREADABLE_FILE" \
         "$HOLD_FILE" "$FILTER_FILE.hold" \
+        /tmp/media-sync.rmlist.$$ /tmp/media-sync.rmrc.$$ \
         /tmp/media-sync.errs.$$ 2>/dev/null
   true
 }
@@ -807,6 +808,93 @@ shell_quote() {
 
 # rsync will not delete a directory that still holds excluded files, and says
 # so. Finish the job for exactly the paths it named - never anything else.
+# The whole list in one operation.
+#
+# Removing them one at a time meant a separate rclone or ssh invocation per
+# file, each paying for process start, connection and authentication before it
+# could send a single request - around five seconds each, so a list of 700 took
+# an hour that the server could have cleared in a couple of minutes.
+#
+# Returns non-zero if anything could not be removed, so the caller can leave
+# those items in the review rather than recording them as dealt with.
+remove_leftovers() {   # $1 = destination root, $2 = file of paths below it
+  _rmroot="$1"; _rmlist="$2"
+  [ -s "$_rmlist" ] || return 0
+
+  # Nothing downstream looks at these again, so anything that could climb out
+  # of the pair root is dropped here rather than checked per item.
+  _rmsafe="/tmp/media-sync.rmlist.$$"
+  awk '
+    $0 == "" { next }
+    substr($0, 1, 1) == "/" { next }
+    index($0, "..") > 0 { next }
+    { print }
+  ' "$_rmlist" > "$_rmsafe"
+
+  _rmasked="$(wc -l < "$_rmlist" | tr -d ' ')"
+  _rmn="$(wc -l < "$_rmsafe" | tr -d ' ')"
+  if [ "$_rmasked" -gt "$_rmn" ]; then
+    log "[$label] $(( _rmasked - _rmn )) unexpected path(s) refused"
+  fi
+  # An empty list is not "nothing to do" for a command that takes a whole
+  # folder as its argument - it is "everything". This is the one place where
+  # getting that wrong would clear the library, so it is checked again here
+  # rather than trusted from above.
+  if [ ! -s "$_rmsafe" ]; then
+    rm -f "$_rmsafe"
+    return 0
+  fi
+
+  case "$_rmroot" in
+    *:*) log "[$label] removing $_rmn item(s) on the server" ;;
+    *)   log "[$label] removing $_rmn item(s)" ;;
+  esac
+  head -n 10 "$_rmsafe" | sed 's/^/      /'
+  [ "$_rmn" -gt 10 ] && log "      ... and $(( _rmn - 10 )) more"
+
+  _rmrc=0
+  case "$_rmroot" in
+    dav:*)
+      _rmrcf="/tmp/media-sync.rmrc.$$"
+      {
+        rclone delete "$_rmroot" --files-from "$_rmsafe" $RCLONE_NET \
+            --checkers "$WEBDAV_PARALLEL" --stats 30s \
+            --stats-log-level NOTICE < /dev/null 2>&1
+        echo $? > "$_rmrcf"
+      } | humanize
+      _rmrc="$(cat "$_rmrcf" 2>/dev/null || echo 1)"
+      rm -f "$_rmrcf"
+      ;;
+    *:*)
+      _rmhost="${_rmroot%%:*}"
+      _rmbase="${_rmroot#*:}"
+      # One session, one remote shell, the names arriving on its standard
+      # input. Putting 700 of them on a command line would run into the
+      # argument limit long before it ran out of names. One name that will not
+      # go does not stop the rest, and the status still says so.
+      $RSH "$_rmhost" \
+          "cd $(shell_quote "$_rmbase") || exit 1
+           rc=0
+           while IFS= read -r p; do rm -rf -- \"\$p\" || rc=1; done
+           exit \$rc" \
+          < "$_rmsafe" || _rmrc=$?
+      ;;
+    *)
+      while IFS= read -r _rmp; do
+        [ -n "$_rmp" ] || continue
+        rm -rf -- "$_rmroot$_rmp" || _rmrc=1
+      done < "$_rmsafe"
+      ;;
+  esac
+
+  rm -f "$_rmsafe"
+  if [ "$_rmrc" -ne 0 ]; then
+    log "[$label] the removal reported errors - nothing is recorded as done"
+    return 1
+  fi
+  return 0
+}
+
 remove_leftover() {   # $1 = destination root, $2 = path relative to it
   _root="$1"; _rel="$2"
 
@@ -1473,12 +1561,11 @@ resolve_decisions() {
       [ "$_skipped" -gt 0 ] && log "[$label] $_skipped no longer missing on the other side - left alone"
       if [ "$DRY_RUN" -eq 1 ]; then
         log "[$label] dry run - nothing deleted"
+      elif remove_leftovers "$_holder" "$_go"; then
+        awk -v l="$label" 'BEGIN { T = sprintf("%c", 9) } { print l T $0 }' \
+          "$_go" >> "$_acted"
       else
-        while IFS= read -r _p; do
-          [ -n "$_p" ] || continue
-          remove_leftover "$_holder" "$_p"
-          printf '%s\t%s\n' "$label" "$_p" >> "$_acted"
-        done < "$_go"
+        log "[$label] these stay in the review and can be tried again"
       fi
       rm -f "$_still" "$_go"
     fi
