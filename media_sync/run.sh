@@ -79,7 +79,7 @@ if ! cmp -s /media-sync.sh "${SCRIPT_COPY}"; then
   log_line "app" "refreshed ${SCRIPT_COPY}"
 fi
 
-export PROTOCOL="$(bashio::config 'source.protocol')"
+export PROTOCOL="$(bashio::config 'source.protocol' | tr 'A-Z' 'a-z')"
 
 # The SSH key is only meaningful for the ssh transport. Generating one for a
 # WebDAV setup would print a key nobody has anywhere to put.
@@ -101,14 +101,14 @@ if bashio::config.true 'advanced.skip_unchanged'; then
 else
   export SKIP_UNCHANGED=0
 fi
-export REMOTE_HOST="$(bashio::config 'source.remote_host')"
-export REMOTE_USER="$(bashio::config 'source.remote_user')"
-export REMOTE_PORT="$(bashio::config 'source.remote_port')"
+export REMOTE_HOST="$(bashio::config 'ssh.host')"
+export REMOTE_USER="$(bashio::config 'ssh.user')"
+export REMOTE_PORT="$(bashio::config 'ssh.port')"
 export REMOTE_BASE="$(bashio::config 'source.remote_base')"
 export REMOTE_KEY="${KEY_FILE}"
-export WEBDAV_URL="$(bashio::config 'source.webdav_url')"
-export WEBDAV_USER="$(bashio::config 'source.webdav_user')"
-export WEBDAV_PASS="$(bashio::config 'source.webdav_pass')"
+export WEBDAV_URL="$(bashio::config 'webdav.url')"
+export WEBDAV_USER="$(bashio::config 'webdav.user')"
+export WEBDAV_PASS="$(bashio::config 'webdav.password')"
 export KNOWN_HOSTS="${KEY_DIR}/known_hosts"
 export STATE_FILE="${STATE_DIR}/state.json"
 export DELETE_REPORT="${STATE_DIR}/deletions.txt"

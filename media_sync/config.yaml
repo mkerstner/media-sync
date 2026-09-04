@@ -1,5 +1,5 @@
 name: Media Sync
-version: "1.10.0"
+version: "2.0.0"
 slug: media_sync
 url: https://github.com/mkerstner/media-sync/tree/main/media_sync
 description: Two-way sync between your media library and a remote server, over SSH or WebDAV such as Nextcloud - from the UI, an automation or a terminal
@@ -31,14 +31,16 @@ map:
 # allows, so it cannot sit inside a group - it stays here between them.
 options:
   source:
-    protocol: ssh
-    remote_host: storage.example.com
-    remote_user: username
-    remote_port: 22
-    webdav_url: ""
-    webdav_user: ""
-    webdav_pass: ""
+    protocol: SSH
     remote_base: ""
+  ssh:
+    host: storage.example.com
+    user: username
+    port: 22
+  webdav:
+    url: ""
+    user: ""
+    password: ""
   sync:
     direction: both
     dry_run: false
@@ -76,14 +78,16 @@ options:
     skip_unchanged: true
 schema:
   source:
-    protocol: list(ssh|webdav)
-    remote_host: str?
-    remote_user: str?
-    remote_port: port?
-    webdav_url: str?
-    webdav_user: str?
-    webdav_pass: password?
+    protocol: list(SSH|WebDAV)
     remote_base: str?
+  ssh:
+    host: str?
+    user: str?
+    port: port?
+  webdav:
+    url: str?
+    user: str?
+    password: password?
   sync:
     direction: list(both|pull|push)
     dry_run: bool

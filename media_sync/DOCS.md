@@ -245,16 +245,34 @@ bandwidth, and the things that help are the ones that reduce or overlap them:
 ## Settings
 
 The options screen is grouped into sections. In YAML the same grouping applies,
-so a setting is written as `source.remote_host` rather than `remote_host`.
+so a setting is written as `ssh.host` rather than `host`.
 
-### Source server
+### Connection
 
 | Setting | What it does |
 | --- | --- |
-| `remote_host` | Hostname or IP of the server. |
-| `remote_user` | The account to log in as. |
-| `remote_port` | SSH port. Usually `22`; a Hetzner Storage Box uses `23`. |
-| `remote_base` | Folder the remote paths are counted from. Leave empty to start from the login's home folder. |
+| `source.protocol` | `SSH` or `WebDAV`. Decides which of the two sections below is used; the other is ignored. |
+| `source.remote_base` | Folder the remote paths are counted from. Leave empty to start at the top. Over SSH that is the login's home folder; over WebDAV it is a folder inside the share, never a path on the server's disk. |
+
+### SSH connection
+
+Used only when `source.protocol` is `SSH`.
+
+| Setting | What it does |
+| --- | --- |
+| `ssh.host` | Hostname or IP of the server. |
+| `ssh.user` | The account to log in as. |
+| `ssh.port` | SSH port. Usually `22`; a Hetzner Storage Box uses `23`. |
+
+### WebDAV connection
+
+Used only when `source.protocol` is `WebDAV`.
+
+| Setting | What it does |
+| --- | --- |
+| `webdav.url` | The address of your Nextcloud. The rest of the WebDAV path is worked out from the username. |
+| `webdav.user` | The account name on that server. |
+| `webdav.password` | An app password, not your account password. |
 
 ### Syncing
 

@@ -1,49 +1,62 @@
 configuration:
   source:
-    name: Source server
+    name: Connection
     description: >-
-      The server to sync with, and where on it to start. The app logs in over
-      SSH with a key it creates for itself, so there is no password to set.
-      WebDAV needs a password, so use an app password rather than your account
-      one.
+      Which way to reach the remote side, and where on it to start. Fill in the
+      section below that matches your choice - the other one is ignored.
     fields:
       protocol:
         name: How to connect
         description: >-
           SSH suits a NAS, a VPS or a rented storage box. WebDAV suits
-          Nextcloud and anything else that speaks it. Fields you do not need
-          for your choice can be left empty.
-      remote_host:
+          Nextcloud and anything else that speaks it.
+      remote_base:
+        name: Base folder
+        description: >-
+          The folder that the remote paths further down are counted from.
+          Leave it empty to start at the top. Over SSH that is the home folder
+          of the account you log in as; over WebDAV it is the root of the
+          share, and a path here means a folder inside it, never a path on the
+          server's disk.
+  ssh:
+    name: SSH connection
+    description: >-
+      Used only when How to connect is set to SSH. The app logs in with a key
+      it creates for itself and prints on first start, so there is no password
+      to set here.
+    fields:
+      host:
         name: Address
         description: >-
           Hostname or IP of the server, for example storage.example.com.
-      remote_user:
+      user:
         name: Username
         description: The account to log in as on that server.
-      remote_port:
+      port:
         name: Port
         description: The port the server listens on for SSH. Usually 22.
-      webdav_url:
-        name: WebDAV address
+  webdav:
+    name: WebDAV connection
+    description: >-
+      Used only when How to connect is set to WebDAV. Unlike SSH this does
+      store a password, so use one that can be revoked on its own.
+    fields:
+      url:
+        name: Address
         description: >-
           The address of your Nextcloud, such as https://cloud.example.com.
           The app works out the rest from the username below. Pasting the full
           address that Nextcloud shows at the bottom of its Files page works
           just as well.
-      webdav_user:
-        name: WebDAV username
+      user:
+        name: Username
         description: The account name on that server.
-      webdav_pass:
-        name: WebDAV password
+      password:
+        name: App password
         description: >-
-          Use an app password, not your account password. In Nextcloud create
-          one under Settings, Security, Create new app password. It can be
-          revoked on its own and keeps working with two-factor login.
-      remote_base:
-        name: Base folder
-        description: >-
-          The folder that the remote paths below are counted from. Leave it
-          empty to start from the home folder of the account you log in as.
+          Not your account password. In Nextcloud create one under Settings,
+          Security, Create new app password. It can be revoked on its own and
+          keeps working with two-factor login.
   sync:
     name: Syncing
     description: >-

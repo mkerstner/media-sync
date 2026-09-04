@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.0.0
+
+**You will need to fill in the connection settings once after updating.** The
+old ones cannot be carried over, for the reasons below. Note down your current
+values before you update.
+
+- The connection settings are now three sections instead of one list:
+  **Connection** (which protocol, and the base folder), **SSH connection**, and
+  **WebDAV connection**. Each says whether it applies, so there is no longer a
+  screen of eight fields with nothing to say which half to fill in.
+- **How to connect** now reads `SSH` and `WebDAV` rather than `ssh` and
+  `webdav`. An app can only label a choice by changing the value itself,
+  which is part of why the old settings do not carry over.
+- The SSH fields moved from `source.remote_host` to `ssh.host`, and likewise
+  for the WebDAV ones. Anything set in YAML or an automation needs the new
+  names.
+
 ## 1.10.0
 
 - New Advanced setting **Skip folders that have not changed**, on by default
