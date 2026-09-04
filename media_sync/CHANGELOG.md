@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.9.7
+
+- Corrected the advice on **Parallel WebDAV requests**. Raising it is right
+  when the folders are Nextcloud own storage and wrong when they are external
+  storage: each request there opens a connection to whatever is behind it,
+  and those are limited - a Hetzner Storage Box allows ten. Asking for more
+  than the limit makes requests fail for want of a connection, which looks
+  like a folder that lists and then cannot be opened.
+- 1.8.0 raised the default to 16 and recommended going higher, which is above
+  that limit and made matters worse for anyone in that position.
+
 ## 1.9.6
 
 - Withdrew the advice to normalise filenames with `convmv`. It rested on a

@@ -1,5 +1,5 @@
 name: Media Sync
-version: "1.9.6"
+version: "1.9.7"
 slug: media_sync
 url: https://github.com/mkerstner/media-sync/tree/main/media_sync
 description: Two-way sync between your media library and a remote server over an encrypted connection - from the UI, an automation or a terminal

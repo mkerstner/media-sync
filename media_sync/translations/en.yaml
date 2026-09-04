@@ -130,8 +130,10 @@ configuration:
         description: >-
           How many requests to a WebDAV share run at once. A share has to be
           listed one folder at a time, so this is the setting that decides how
-          quickly a large one is scanned. Raise it if scans are slow, lower it
-          if your server struggles. Ignored when connecting over SSH.
+          quickly a large one is scanned. Raise it if scans are slow. Lower it
+          a long way, to 2 or 3, if the folders are Nextcloud external storage:
+          each request then opens a connection to whatever is behind it, and
+          those are limited. Ignored when connecting over SSH.
       log_keep_days:
         name: Keep log entries for
         description: >-

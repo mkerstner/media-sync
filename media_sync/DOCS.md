@@ -207,8 +207,15 @@ folder at a time. That makes scanning a matter of round trips rather than
 bandwidth, and the things that help are the ones that reduce or overlap them:
 
 - **Parallel WebDAV requests**, under Advanced, decides how many of those
-  round trips happen at once. It defaults to 16. Raising it is usually the
-  single most effective change; lower it if the server struggles.
+  round trips happen at once. It defaults to 16.
+
+  Raise it if the folders really are Nextcloud own storage. **Lower it, a
+  long way, if they are external storage** - see above. Each request there
+  makes Nextcloud open a connection to whatever is behind it, and those are
+  usually limited: a Hetzner Storage Box allows ten at once, and other
+  providers are similar. Ask for more than the limit and requests start
+  failing for want of a connection, which surfaces as a folder that lists and
+  then cannot be opened. Try 2 or 3 and see whether the failures stop.
 - **Exclude what you do not sync.** Anything not excluded is walked in full,
   every run, even if nothing in it ever changes.
 - **Point the pair at a smaller folder**, or use the include list, rather than
