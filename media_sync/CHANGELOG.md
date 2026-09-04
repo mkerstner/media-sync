@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.9.9
+
+- The Info tab now describes both ways to connect. It still said the app works
+  with any server reachable over SSH and that there is no password to store,
+  which stopped being the whole story when WebDAV arrived in 1.7.0.
+- It also says what to check before choosing WebDAV: a Nextcloud folder that
+  is external storage is reached better through the storage itself.
+
 ## 1.9.8
 
 - Scan progress says something again. 1.9.4 compressed it to one line, but

@@ -1,8 +1,8 @@
 name: Media Sync
-version: "1.9.8"
+version: "1.9.9"
 slug: media_sync
 url: https://github.com/mkerstner/media-sync/tree/main/media_sync
-description: Two-way sync between your media library and a remote server over an encrypted connection - from the UI, an automation or a terminal
+description: Two-way sync between your media library and a remote server, over SSH or WebDAV such as Nextcloud - from the UI, an automation or a terminal
 # Without an "image" key the Supervisor builds from the Dockerfile on the
 # user's own machine. Add
 #   image: ghcr.io/mkerstner/media-sync-{arch}
