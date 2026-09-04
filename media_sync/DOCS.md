@@ -206,6 +206,22 @@ WebDAV has no way to ask for a whole tree at once, so a share is listed one
 folder at a time. That makes scanning a matter of round trips rather than
 bandwidth, and the things that help are the ones that reduce or overlap them:
 
+- **Skip folders that have not changed**, under Advanced and on by default,
+  is the one that helps most when there is nothing to do. Nextcloud gives a
+  folder a new tag whenever anything inside it is updated, and the change
+  carries up to the parent folders, so one question against the top of a pair
+  answers whether anything below it moved. A run with nothing to sync then
+  finishes in seconds rather than walking the tree to discover that.
+
+  The local side is checked too, by looking for anything modified since the
+  last sync - which catches deletions as well, because removing a file moves
+  the time on the folder that held it.
+
+  Anything uncertain counts as changed. A tag that cannot be read, a pair that
+  has never synced, a folder that is missing: all of those fall back to the
+  full scan, so the cost of being wrong is a slow run rather than a missed
+  one.
+
 - **Parallel WebDAV requests**, under Advanced, decides how many of those
   round trips happen at once. It defaults to 16.
 

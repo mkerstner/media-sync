@@ -134,6 +134,15 @@ configuration:
           a long way, to 2 or 3, if the folders are Nextcloud external storage:
           each request then opens a connection to whatever is behind it, and
           those are limited. Ignored when connecting over SSH.
+      skip_unchanged:
+        name: Skip folders that have not changed
+        description: >-
+          Before syncing a folder pair over WebDAV, ask the server whether
+          anything inside it has changed since last time. One question instead
+          of listing every folder, so a run with nothing to do finishes in
+          seconds. Anything uncertain counts as changed, so the worst case is
+          the full scan you would have had anyway. Ignored over SSH, where
+          listing is already cheap.
       log_keep_days:
         name: Keep log entries for
         description: >-

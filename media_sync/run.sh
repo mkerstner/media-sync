@@ -96,6 +96,11 @@ fi
 
 export VERBOSITY="$(bashio::config 'advanced.sync_log_verbosity')"
 export WEBDAV_PARALLEL="$(bashio::config 'advanced.webdav_parallel')"
+if bashio::config.true 'advanced.skip_unchanged'; then
+  export SKIP_UNCHANGED=1
+else
+  export SKIP_UNCHANGED=0
+fi
 export REMOTE_HOST="$(bashio::config 'source.remote_host')"
 export REMOTE_USER="$(bashio::config 'source.remote_user')"
 export REMOTE_PORT="$(bashio::config 'source.remote_port')"

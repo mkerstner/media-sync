@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.10.0
+
+- New Advanced setting **Skip folders that have not changed**, on by default
+  and only used over WebDAV. Nextcloud gives a folder a new tag whenever
+  anything inside it is updated, and the change carries up to the parents, so
+  one question against the top of a pair answers whether anything below it
+  moved. A run with nothing to do now finishes in seconds instead of listing
+  every folder to find that out.
+- The local side is checked as well, so a change made in Home Assistant is
+  still picked up. Deletions count: removing a file moves the time on the
+  folder that held it.
+- Anything uncertain counts as changed - an unreadable tag, a pair that has
+  never synced - so the cost of being wrong is a slow run, never a missed one.
+
 ## 1.9.10
 
 - **Confirming a deletion in the review now actually deletes.** Every run

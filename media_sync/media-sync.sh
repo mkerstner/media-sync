@@ -67,6 +67,11 @@ WEBDAV_PASS="${WEBDAV_PASS:-}"
 # it is a setting rather than a constant.
 WEBDAV_PARALLEL="${WEBDAV_PARALLEL:-16}"
 
+# Skip a folder pair when neither side has changed since it last synced. Only
+# meaningful over WebDAV, where finding that out any other way means listing
+# the whole tree one directory at a time.
+SKIP_UNCHANGED="${SKIP_UNCHANGED:-1}"
+
 MEDIA_DIR="${MEDIA_DIR:-/media}"
 
 # --- what to synchronise ----------------------------------------------------
@@ -993,6 +998,61 @@ sync_one_way() {
   rm -f "$_errs"
 }
 
+# ---- skipping a pair that cannot have changed ------------------------------
+# Nextcloud gives a folder a new etag whenever anything inside it is updated,
+# and the change carries up to the parents. So one request against a pair's
+# root answers "has anything changed on the server", where the alternative is
+# listing every directory below it.
+#
+# Each pair keeps one small file: its contents are the etag as of the last
+# completed sync, and its modification time is when that sync happened, which
+# is what the local side gets compared against.
+
+pair_stamp() {   # $1 = pair label
+  printf '%s/.pair-%s' "$STATE_DIR" "$(printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '_')"
+}
+
+# The etag of one folder on the server, or nothing if it cannot be read.
+remote_etag() {   # $1 = path below the WebDAV root
+  command -v curl >/dev/null 2>&1 || return 0
+  curl -sS -u "$WEBDAV_USER:$WEBDAV_PASS" -X PROPFIND -H 'Depth: 0'       --max-time 30       --data '<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:getetag/></d:prop></d:propfind>'       "${WEBDAV_URL%/}/$1" 2>/dev/null     | sed -n 's/.*<[A-Za-z0-9]*:*getetag>\(.*\)<\/[A-Za-z0-9]*:*getetag>.*/\1/p' \
+    | sed 's/&quot;//g; s/"//g' \
+    | head -1
+}
+
+# True when the pair can be skipped. Anything unknown counts as changed, so a
+# failure to read the etag costs a full scan rather than a missed sync.
+pair_unchanged() {   # $1 = label, $2 = remote path, $3 = local path
+  [ "$SKIP_UNCHANGED" -eq 1 ] || return 1
+  [ "$PROTOCOL" = "webdav" ] || return 1
+  case "$MODE" in sync|dry_run) ;; *) return 1 ;; esac
+
+  _stamp="$(pair_stamp "$1")"
+  [ -f "$_stamp" ] || return 1
+
+  _now="$(remote_etag "$2")"
+  [ -n "$_now" ] || return 1
+  [ "$_now" = "$(cat "$_stamp" 2>/dev/null)" ] || return 1
+
+  # A local change moves a file's time, and a local deletion moves the time of
+  # the folder that held it, so both are caught. -quit stops at the first one.
+  [ -d "$3" ] || return 1
+  [ -z "$(find "$3" -newer "$_stamp" -print -quit 2>/dev/null)" ] || return 1
+
+  return 0
+}
+
+record_pair_state() {   # $1 = label, $2 = remote path
+  [ "$SKIP_UNCHANGED" -eq 1 ] || return 0
+  [ "$PROTOCOL" = "webdav" ] || return 0
+  [ "$MODE" = "sync" ] || return 0
+
+  _now="$(remote_etag "$2")"
+  [ -n "$_now" ] || return 0
+  mkdir -p "$STATE_DIR"
+  printf '%s\n' "$_now" > "$(pair_stamp "$1")"
+}
+
 # ---- applying review decisions ---------------------------------------------
 # Home Assistant records one line per reviewed folder: action, label, folder.
 # "keep" copies the candidates back to the side that is missing them, "delete"
@@ -1168,8 +1228,15 @@ while IFS='|' read -r name rsub lloc pair_excl; do
 
   # Deletions are resolved per direction *before* the merge: once both sides
   # have been merged, nothing looks deleted any more.
+  if pair_unchanged "$name" "$rpath" "$lpath"; then
+    log "[$name] nothing has changed on either side since the last sync - skipped"
+    continue
+  fi
+
   if [ "$DO_PULL" -eq 1 ]; then sync_one_way "$name pull" "$remote" "$lpath"; fi
   if [ "$DO_PUSH" -eq 1 ]; then sync_one_way "$name push" "$lpath"  "$remote"; fi
+
+  record_pair_state "$name" "$rpath"
 done <<EOF
 $SYNC_PAIRS
 EOF
