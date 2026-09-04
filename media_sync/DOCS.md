@@ -113,6 +113,33 @@ what it settled on. Every run also prints the remote each pair resolved to, so
 a wrong base folder shows up as a line you can read rather than a failure you
 have to interpret.
 
+### First check what the folder actually is
+
+Open **Settings, Administration, External storage** in Nextcloud and see
+whether the folder you are about to sync is listed there.
+
+If it is, do not sync it over WebDAV. An external storage folder is not stored
+by Nextcloud - it is a view onto something else, reached over SFTP, SMB, S3 or
+similar. Syncing it over WebDAV means every listing becomes an HTTP request
+that Nextcloud turns into operations against that other system, and every byte
+travels twice:
+
+    Home Assistant -> WebDAV -> Nextcloud -> SFTP -> the real storage
+
+Point this app at the real storage instead. Over SFTP that is the SSH
+transport, which is faster by a wide margin, preserves timestamps and
+permissions properly, and needs no password. Nextcloud goes on serving the
+same files to your other devices, because it is the same filesystem either
+way - nothing about your Nextcloud setup has to change.
+
+It also avoids a class of failure that belongs to the middle layer rather than
+to either end. Names that a filesystem stores in one Unicode form are not
+always handed back by Nextcloud's external storage in the form it will accept
+again, so a folder lists successfully and then cannot be opened. Reaching the
+storage directly, there is no translation to get wrong.
+
+WebDAV is the right choice when the files really are Nextcloud's own.
+
 ### Why this is the right way to reach Nextcloud
 
 Syncing files into Nextcloud's storage directly, behind its back, leaves its

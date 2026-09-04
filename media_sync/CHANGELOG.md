@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.9.5
+
+- Documented when **not** to use WebDAV. A Nextcloud folder that is external
+  storage is a view onto something else - SFTP, SMB, S3 - and syncing it over
+  WebDAV routes every listing through Nextcloud into that other system, then
+  moves every byte twice. Point the app at the real storage instead. Over SFTP
+  that is the SSH transport, and Nextcloud goes on serving the same files
+  because it is the same filesystem.
+
 ## 1.9.4
 
 - The scan reports progress on one line instead of a five-line block every
