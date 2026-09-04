@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.9.6
+
+- Withdrew the advice to normalise filenames with `convmv`. It rested on a
+  diagnosis that does not hold: Nextcloud own clients read those names
+  without trouble, so the names were never the problem. Renaming files in
+  bulk is a large thing to do on a guess, and this told people to do it.
+- A folder that lists and then cannot be opened now points at the external
+  storage question instead, which is where that failure actually comes from.
+
 ## 1.9.5
 
 - Documented when **not** to use WebDAV. A Nextcloud folder that is external

@@ -186,17 +186,19 @@ it could not handle, and reports the run as failed at the end. One unreadable
 path used to stop every other file, and every later folder pair, from syncing
 at all.
 
-The most common cause with Nextcloud is a filename in the wrong Unicode form.
-A name typed on a Mac or stored on a Synology uses NFD, where the umlaut in
-`Übungen` is a plain U followed by a combining mark; Nextcloud and Linux use
-NFC, where it is a single character. They look identical and are different
-bytes, and Nextcloud does not consistently reach files stored the first way.
+Over WebDAV, the shape to look out for is a folder that lists successfully and
+then cannot be opened: `error reading source directory: directory not found`
+against a folder you can see perfectly well in a browser.
 
-That is a problem in the files themselves, not something this app can work
-around: the server answers with a path it will not then accept. The fix is to
-normalise the names on the Nextcloud side, for example with `convmv -r -f
-utf-8 -t utf-8 --nfc` over the data directory followed by
-`occ files:scan --all`. Try it on one folder first, and have a backup.
+Check first whether that folder is **external storage** rather than storage of
+Nextcloud's own - see above. A name that arrives through that layer is not
+always handed back in the form it will be accepted in again, which is exactly
+what a folder that lists and then vanishes looks like. Syncing the underlying
+storage directly avoids the translation entirely, and is faster besides.
+
+Do not start renaming files over this. Nextcloud's own clients read these
+names without trouble, so the names are not the problem, and normalising them
+in bulk is a large change made on a guess.
 
 ### If a WebDAV sync is slow
 
