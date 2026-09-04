@@ -646,9 +646,18 @@ scan_deletes() {   # $1 = source, $2 = destination
     _scan_err="/tmp/media-sync.scanerr.$$"
     rclone check "$1" "$2" --size-only --missing-on-src - \
         --filter-from "$FILTER_FILE" $RCLONE_NET --stats 30s \
-        --stats-one-line --stats-log-level NOTICE < /dev/null 2>&1 >"$_scan_out" \
+        --stats-log-level NOTICE < /dev/null 2>&1 >"$_scan_out" \
       | tee "$_scan_err" \
-      | grep -v ' ERROR : .*: file not in ' >&2 || true
+      | awk '
+          # A file on one side and not the other. That is the answer, not a
+          # failure, and it is already going into the candidate list.
+          / ERROR : .*: file not in / { next }
+          # Of the stats block, only the check count says anything during a
+          # scan: nothing is transferred, and "Errors" counts the differences.
+          /^Transferred:|^Errors:|^Elapsed time:/ { next }
+          /NOTICE: *$/ { next }
+          { print; fflush() }
+        ' >&2 || true
 
     # A folder the listing could not read at all:
     #

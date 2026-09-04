@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.9.8
+
+- Scan progress says something again. 1.9.4 compressed it to one line, but
+  the one-line form carries only the transfer counters, which a scan never
+  touches - so it reported `0 B / 0 B, -, 0 B/s, ETA -` every thirty seconds
+  and nothing else. The line now shown is the check count, which is the one
+  that moves: `Checks: 5114 / 5114, 100%, Listed 11963`.
+- The rest of the block stays out of the log: nothing is transferred during a
+  scan, and its error count is the number of differences found.
+
 ## 1.9.7
 
 - Corrected the advice on **Parallel WebDAV requests**. Raising it is right
