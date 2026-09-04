@@ -327,7 +327,17 @@ write_state() {   # $1 = status, $2 = error text (may be empty)
     # every few seconds.
     mkdir -p "$(dirname "$PENDING_TSV")"
     cp "$PENDING_FILE" "$PENDING_TSV"
-  else
+  elif [ "$1" = "ok" ]; then
+    # Only a run that got to the end can say there is nothing pending.
+    #
+    # Every run calls this with "running" before it does anything, when the
+    # list it has recorded so far is necessarily empty. Clearing the file
+    # there deleted the candidates of the previous run - including on a
+    # --resolve run, which then had nothing left to act on and threw away the
+    # decisions it had been started to carry out.
+    #
+    # A failed or interrupted run has not established anything either, and the
+    # previous list is still the best that is known.
     rm -f "$PENDING_TSV" 2>/dev/null || true
   fi
   [ "$1" = "running" ] && _finished="" || _finished="$(now_iso)"

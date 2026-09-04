@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.9.10
+
+- **Confirming a deletion in the review now actually deletes.** Every run
+  records its state as "running" before doing anything, and at that moment the
+  list of candidates it has found is empty - which was taken to mean nothing
+  is pending, and cleared the file holding the previous run findings. A
+  `--resolve` run therefore deleted its own input before reading it, reported
+  "no recorded candidates left to act on", and discarded the decisions it had
+  been started to carry out.
+- The file is now only cleared by a run that reached the end and found
+  nothing. A run that is still going, or that failed, leaves it alone.
+
+Deletion protection does not need to be turned off to confirm a deletion. It
+never did - the review was simply unable to act.
+
 ## 1.9.9
 
 - The Info tab now describes both ways to connect. It still said the app works
