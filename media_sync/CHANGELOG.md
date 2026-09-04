@@ -1,5 +1,31 @@
 # Changelog
 
+## 2.3.0
+
+Deleting files on the Home Assistant side was never reported, and in "both"
+mode the deletion was undone before anything looked for it.
+
+- **Every scan now runs before any transfer.** A run used to scan and sync one
+  direction, then scan and sync the other. In "both" mode the pull therefore
+  copied back whatever had just been deleted locally, and the push that
+  followed found nothing missing and said nothing. Deletions on the *server*
+  side were reported - the pull scans first - and then quietly put back by the
+  push.
+- **Items waiting for a decision are held out of the transfer.** The log has
+  always said they were "left alone"; now they are. Without this, confirming
+  "delete it on the server" would remove a file the same run had just restored
+  locally, and it would come straight back as a candidate in the opposite
+  direction.
+- **A pair with an unanswered review is never skipped.** The quick check asks
+  whether either side has changed since the last sync. Both sides can be
+  perfectly quiet while a review is still outstanding, and a skipped pair
+  reports nothing - so the notification was cleared by the next run and the
+  candidates were lost.
+- **Stamps written by an earlier version are retired.** One of them may say a
+  pair is settled when a local deletion was silently reversed instead, so the
+  first run after this update compares everything. That run will take as long
+  as a full one.
+
 ## 2.2.0
 
 - New Advanced setting **How deep to look for changes**, default 2. Until now,

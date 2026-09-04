@@ -156,6 +156,12 @@ PENDING_FILE="/tmp/media-sync.pending.$$"
 # The scan runs inside a command substitution and so cannot pass a variable
 # back to its caller - it leaves the folders here instead.
 UNREADABLE_FILE="/tmp/media-sync.unreadable.$$"
+# Paths the review has not answered for yet. Until it does, neither side may
+# act on them. Copying one back would undo the very deletion the review is
+# asking about, and a later "delete it on the other side" would then leave the
+# copy that had just been restored - so the same file comes back round as a
+# candidate in the opposite direction, run after run.
+HOLD_FILE="/tmp/media-sync.hold.$$"
 # rclone announces a missing config file on every invocation. The backend is
 # configured through the environment on purpose, so there is nothing to put in
 # one - but an empty file it can find is quieter than a notice per command.
@@ -384,6 +390,7 @@ cleanup() {
   [ "$FINISHED" -eq 0 ] && write_state failed "interrupted"
   [ "${LOCK_HELD:-0}" -eq 1 ] && rmdir "$LOCK_DIR" 2>/dev/null
   rm -f "$FILTER_FILE" "$PENDING_FILE" "$RCLONE_CONF" "$UNREADABLE_FILE" \
+        "$HOLD_FILE" "$FILTER_FILE.hold" \
         /tmp/media-sync.errs.$$ 2>/dev/null
   true
 }
@@ -898,47 +905,102 @@ tally() {   # $1 = label, $2 = captured raw rsync output
   ' "$2"
 }
 
-sync_one_way() {
+# ---- items awaiting a decision ---------------------------------------------
+
+# Remember paths the review still has to answer for.
+hold_paths() {   # $1 = newline separated paths
+  printf '%s\n' "$1" >> "$HOLD_FILE"
+}
+
+# Turn those into filter rules and put them at the *front* of the filter file.
+# rsync and rclone both act on the first rule that matches, so an include
+# whitelist further down would otherwise win and the item would move anyway.
+apply_holds() {
+  [ -s "$HOLD_FILE" ] || return 0
+  _tmp="$FILTER_FILE.hold"
+  {
+    sort -u "$HOLD_FILE" | while IFS= read -r _h; do
+      _h="${_h#/}"; _h="${_h%/}"
+      [ -n "$_h" ] || continue
+      # These are names, not patterns. Both tools read the same escape, so a
+      # folder called "Season [2020]" is held rather than read as a character
+      # class that matches nothing and quietly lets the item through. The
+      # escape is built by code point: a literal one does not survive the
+      # layers of quoting between here and awk.
+      _e="$(printf '%s' "$_h" | awk '
+        BEGIN { BS = sprintf("%c", 92) }
+        {
+          out = ""
+          for (i = 1; i <= length($0); i++) {
+            c = substr($0, i, 1)
+            if (index("*?[]" BS, c) > 0) out = out BS
+            out = out c
+          }
+          print out
+        }')"
+      printf -- '- /%s\n- /%s/\n- /%s/**\n' "$_e" "$_e" "$_e"
+    done
+    cat "$FILTER_FILE"
+  } > "$_tmp" && mv "$_tmp" "$FILTER_FILE"
+}
+
+# Finding what is missing and moving the files are two steps, not one, because
+# in "both" mode every scan has to happen before any transfer.
+#
+# Run as one step, the pull copied back whatever had been deleted locally, and
+# the push that followed then found nothing missing and reported nothing. A
+# deletion made on the local side was undone before anything ever looked for
+# it. Deletions on the remote side were reported - the pull scan runs first -
+# and then put back by the push.
+#
+# The confirmation this step arrives at is left in DEL_OPT for the transfer.
+scan_one_way() {   # $1 = label, $2 = source, $3 = destination
   label="$1"; src="$2"; dst="$3"
-  del_opt=""
+  DEL_OPT=""
 
-  if [ "$CHECK_DELETES" -eq 1 ]; then
-    log "[$label] looking for items that exist on one side only..."
-    dels="$(scan_deletes "$src" "$dst")"
+  [ "$CHECK_DELETES" -eq 1 ] || return 0
 
-    if [ -s "$UNREADABLE_FILE" ]; then
-      RUN_HAD_ERRORS=1
-      _bad="$(wc -l < "$UNREADABLE_FILE" | tr -d ' ')"
-      log "[$label] $_bad folder(s) could not be read, so what is inside them is unknown:"
-      head -n 10 "$UNREADABLE_FILE" | sed 's/^/      /'
-      [ "$_bad" -gt 10 ] && log "      ... and $(( _bad - 10 )) more"
-      log "[$label] nothing inside them is offered for deletion until they can be read"
-    fi
+  log "[$label] looking for items that exist on one side only..."
+  dels="$(scan_deletes "$src" "$dst")"
 
-    if [ -n "$dels" ]; then
-      count="$(printf '%s\n' "$dels" | wc -l | tr -d ' ')"
-      log "[$label] $count item(s) present in the destination but not the source:"
-      printf '%s\n' "$dels" | sed 's/^/      /'
-      {
-        echo "### $label  $(now_iso)  -  $count item(s)"
-        echo "###   from: $src"
-        echo "###   to:   $dst"
-        printf '%s\n' "$dels"
-        echo
-      } >> "$DELETE_REPORT"
-
-      if [ "$MODE" != "sync" ]; then
-        record_pending "$label" "$dels"
-        log "[$label] $MODE - $count item(s) would be deleted, left alone"
-      elif confirm "[$label] Delete these $count item(s) from the destination?"; then
-        del_opt="--delete"
-        log "[$label] deletions confirmed"
-      else
-        record_pending "$label" "$dels"
-        log "[$label] not confirmed - $count item(s) left alone"
-      fi
-    fi
+  if [ -s "$UNREADABLE_FILE" ]; then
+    RUN_HAD_ERRORS=1
+    _bad="$(wc -l < "$UNREADABLE_FILE" | tr -d ' ')"
+    log "[$label] $_bad folder(s) could not be read, so what is inside them is unknown:"
+    head -n 10 "$UNREADABLE_FILE" | sed 's/^/      /'
+    [ "$_bad" -gt 10 ] && log "      ... and $(( _bad - 10 )) more"
+    log "[$label] nothing inside them is offered for deletion until they can be read"
   fi
+
+  [ -n "$dels" ] || return 0
+
+  count="$(printf '%s\n' "$dels" | wc -l | tr -d ' ')"
+  log "[$label] $count item(s) present in the destination but not the source:"
+  printf '%s\n' "$dels" | sed 's/^/      /'
+  {
+    echo "### $label  $(now_iso)  -  $count item(s)"
+    echo "###   from: $src"
+    echo "###   to:   $dst"
+    printf '%s\n' "$dels"
+    echo
+  } >> "$DELETE_REPORT"
+
+  if [ "$MODE" != "sync" ]; then
+    record_pending "$label" "$dels"
+    hold_paths "$dels"
+    log "[$label] $MODE - $count item(s) would be deleted, left alone"
+  elif confirm "[$label] Delete these $count item(s) from the destination?"; then
+    DEL_OPT="--delete"
+    log "[$label] deletions confirmed"
+  else
+    record_pending "$label" "$dels"
+    hold_paths "$dels"
+    log "[$label] not confirmed - $count item(s) left alone"
+  fi
+}
+
+transfer_one_way() {   # $1 = label, $2 = source, $3 = destination, $4 = deletes
+  label="$1"; src="$2"; dst="$3"; del_opt="$4"
 
   [ "$SCAN_ONLY" -eq 1 ] && return 0
 
@@ -1018,7 +1080,7 @@ sync_one_way() {
 # is what the local side gets compared against.
 
 pair_stamp() {   # $1 = pair label
-  printf '%s/.pair-%s' "$STATE_DIR" "$(printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '_')"
+  printf '%s/.pair2-%s' "$STATE_DIR" "$(printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '_')"
 }
 
 # When a pair last synced, taken from the stamp's own modification time.
@@ -1049,6 +1111,16 @@ pair_unchanged() {   # $1 = label, $2 = remote path, $3 = local path
 
   _stamp="$(pair_stamp "$1")"
   [ -f "$_stamp" ] || return 1
+
+  # Items still waiting for a review decision keep the pair live, however
+  # quiet both sides have been. They have to be reported again, and a skipped
+  # pair contributes nothing to the state file - so skipping here would clear
+  # the very notification that is asking about them.
+  if [ -s "$PENDING_TSV" ] && awk -F "$TAB" -v a="$1 pull" -v b="$1 push" \
+       '$1 == a || $1 == b { hit = 1; exit } END { exit hit ? 0 : 1 }' \
+       "$PENDING_TSV"; then
+    return 1
+  fi
 
   _now="$(remote_etag "$2")"
   [ -n "$_now" ] || return 1
@@ -1476,10 +1548,26 @@ while IFS='|' read -r name rsub lloc pair_excl; do
     log "[$name] $_folders folder(s) changed - comparing only those"
   fi
 
-  if [ "$DO_PULL" -eq 1 ]; then sync_one_way "$name pull" "$remote" "$lpath"; fi
-  if [ "$DO_PUSH" -eq 1 ]; then sync_one_way "$name push" "$lpath"  "$remote"; fi
+  # Every scan runs before any transfer, so that what one direction is about
+  # to ask about is not quietly put back by the other. See scan_one_way.
+  : > "$HOLD_FILE"
+  _pull_del=""; _push_del=""
+  if [ "$DO_PULL" -eq 1 ]; then scan_one_way "$name pull" "$remote" "$lpath"; _pull_del="$DEL_OPT"; fi
+  if [ "$DO_PUSH" -eq 1 ]; then scan_one_way "$name push" "$lpath"  "$remote"; _push_del="$DEL_OPT"; fi
+  apply_holds
 
-  record_pair_state "$name" "$rpath"
+  if [ "$DO_PULL" -eq 1 ]; then transfer_one_way "$name pull" "$remote" "$lpath" "$_pull_del"; fi
+  if [ "$DO_PUSH" -eq 1 ]; then transfer_one_way "$name push" "$lpath"  "$remote" "$_push_del"; fi
+
+  # A pair still holding items the review has not answered for has not settled,
+  # so it must not be stamped as done: the next run would see two quiet sides,
+  # skip the pair, and the report would never be raised again. Clearing the
+  # stamp also undoes one left behind by an earlier run in that state.
+  if [ -s "$HOLD_FILE" ]; then
+    rm -f "$(pair_stamp "$name")" 2>/dev/null || true
+  else
+    record_pair_state "$name" "$rpath"
+  fi
 done <<EOF
 $SYNC_PAIRS
 EOF

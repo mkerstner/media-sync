@@ -500,6 +500,22 @@ recorded candidates inside it and nothing else - a folder holding two
 candidates usually holds hundreds of correctly synced files, and those are
 never touched.
 
+### While a decision is outstanding
+
+A candidate is left out of the transfer entirely until you answer for it.
+
+That matters most in **both** directions. A file you deleted on the Home
+Assistant side is still on the server, so a plain merge would copy it back -
+and then, if you confirmed the deletion, remove it from the server while the
+copy it had just restored stayed behind. The same file would come round again
+as a candidate in the opposite direction, run after run. Holding it means
+neither side moves until you say which one is right.
+
+A pair with an open review is also never skipped by the quick change check.
+Both sides can be perfectly still while the question is unanswered, and a
+skipped pair reports nothing at all - so the notification would clear itself
+and the list would be gone.
+
 ### Before anything is deleted
 
 A deletion is re-checked at the moment it is applied. If a file has since
