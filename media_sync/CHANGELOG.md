@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.1
+
+- A skipped folder pair now says when it last synced:
+  `nothing has changed on either side since the last sync at 2026-09-04 16:12
+  - skipped`. The time was already there, being the age of the record the
+  check reads; it just was not shown, which left no way to tell a pair that
+  syncs constantly from one that has quietly not run for a week.
+
 ## 2.0.0
 
 **You will need to fill in the connection settings once after updating.** The

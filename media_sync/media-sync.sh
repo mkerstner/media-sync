@@ -1012,6 +1012,17 @@ pair_stamp() {   # $1 = pair label
   printf '%s/.pair-%s' "$STATE_DIR" "$(printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '_')"
 }
 
+# When a pair last synced, taken from the stamp's own modification time.
+# Prints nothing if it cannot be read, so callers can leave it out.
+stamp_time() {   # $1 = stamp file
+  [ -f "$1" ] || return 1
+  date -r "$1" '+%Y-%m-%d %H:%M' 2>/dev/null && return 0
+  # Not every date understands -r; fall back to the timestamp itself.
+  _epoch="$(stat -c %Y "$1" 2>/dev/null)" || return 1
+  [ -n "$_epoch" ] || return 1
+  date -d "@$_epoch" '+%Y-%m-%d %H:%M' 2>/dev/null
+}
+
 # The etag of one folder on the server, or nothing if it cannot be read.
 remote_etag() {   # $1 = path below the WebDAV root
   command -v curl >/dev/null 2>&1 || return 0
@@ -1229,7 +1240,8 @@ while IFS='|' read -r name rsub lloc pair_excl; do
   # Deletions are resolved per direction *before* the merge: once both sides
   # have been merged, nothing looks deleted any more.
   if pair_unchanged "$name" "$rpath" "$lpath"; then
-    log "[$name] nothing has changed on either side since the last sync - skipped"
+    _when="$(stamp_time "$(pair_stamp "$name")" || true)"
+    log "[$name] nothing has changed on either side since the last sync${_when:+ at $_when} - skipped"
     continue
   fi
 

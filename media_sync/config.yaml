@@ -1,5 +1,5 @@
 name: Media Sync
-version: "2.0.0"
+version: "2.0.1"
 slug: media_sync
 url: https://github.com/mkerstner/media-sync/tree/main/media_sync
 description: Two-way sync between your media library and a remote server, over SSH or WebDAV such as Nextcloud - from the UI, an automation or a terminal
