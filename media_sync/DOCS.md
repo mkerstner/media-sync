@@ -178,9 +178,10 @@ reached so far, so its own "100%" would read true from the very first line.
 
 Everything else it prints is left out, because a scan has one useful answer and
 the app states that itself in the lines that follow. In that tool's vocabulary
-a file on one side and not the other counts as an *error* - that is how it
-signals "these two are not identical" to whatever called it - so a first run
-used to end on:
+*every* difference is an error - a file on one side only, two files of
+different sizes, two files whose hashes disagree - because that is how it tells
+whatever called it that the two sides are not identical. So a first run used to
+end on:
 
 ```
 NOTICE: Failed to check with 4530 errors: last error was: 4530 differences found

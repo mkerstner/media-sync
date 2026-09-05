@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.3.4
+
+Fixes a line 2.3.2 introduced:
+
+```
+[Documents pull] could not compare Work/Hetzner/Hetzner-Server-Doc.md: sizes differ
+```
+
+Comparing is exactly what had happened. The file is on both sides at different
+sizes, which is neither a failure nor any business of a scan looking for items
+that exist on one side only - both copies exist, so neither is a candidate for
+deletion, and the sync that follows settles which one wins.
+
+- **Every difference is now recognised as an answer rather than a problem.** In
+  the underlying tool a file on one side only, two files of different sizes and
+  two files whose hashes disagree are all reported at error level, because that
+  is how it says "these two are not identical". 2.3.2 named only the first of
+  those, so the rest were announced as failures to compare.
+- A genuine per-item problem still reaches the log, in plain words, along with
+  any folder that could not be read.
+
 ## 2.3.3
 
 A WebDAV run against a deep folder tree kept ending on:

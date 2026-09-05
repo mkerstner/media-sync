@@ -721,9 +721,19 @@ scan_deletes() {   # $1 = source, $2 = destination
           # while the scan is still running. The count is the useful part.
           /^Checks:/ { printf "compared %s items so far\n", $2; fflush(); next }
 
-          # A file on one side and not the other. That is the answer, not a
-          # failure, and it is already going into the candidate list.
-          / ERROR : .*: file not in / { next }
+          # Every difference rclone finds is reported at error level - that is
+          # how it tells whatever called it that the two sides are not
+          # identical. A file on one side only, two files of different sizes,
+          # two files whose hashes disagree: each of those is the answer this
+          # scan exists to produce, not a problem with producing it.
+          #
+          # Naming only the first of them was the mistake this replaces. The
+          # others fell through to the rule below and were announced as
+          # "could not compare X: sizes differ", when comparing is precisely
+          # what had just happened. A size difference is no business of this
+          # scan in any case: both copies exist, so neither is a candidate for
+          # deletion, and the sync that follows settles which one wins.
+          tolower($0) ~ / error : .*(file not in |differ)/ { next }
 
           # Reported on its own once the scan has finished, together with what
           # it means for the result, so repeating it here says it twice.
