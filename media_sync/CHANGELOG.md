@@ -1,5 +1,32 @@
 # Changelog
 
+## 2.3.3
+
+A WebDAV run against a deep folder tree kept ending on:
+
+```
+http2: server sent GOAWAY and closed the connection; LastStreamID=6623,
+ErrCode=unknown error code 0xfffffc7a, debug="The user callback function failed"
+```
+
+- **New Advanced setting: Use HTTP/1.1 for WebDAV**, on by default. Over HTTP/2
+  every request is a stream on one connection, and a server limits how many
+  streams one connection may carry. Listing a deep tree runs to thousands of
+  requests, so the limit is reached partway through and the server closes the
+  connection, taking every request still in flight with it. HTTP/1.1 spreads
+  the same work over a pool of connections and recycles them as it goes.
+- **Lowering Parallel WebDAV requests does not help with this**, which is worth
+  knowing because it is the obvious thing to reach for. That limit counts
+  requests over the life of one connection, not how many run at once, so
+  halving the parallelism halves nothing.
+- `0xfffffc7a` is -902, nghttp2's "callback failure", so this is the Apache in
+  front of Nextcloud giving up on the connection rather than the app giving up
+  on a request. Turn the setting off if your server handles HTTP/2 well.
+
+Nothing was ever deleted because of it: a folder whose listing failed is
+already reported as unreadable, and everything inside it is held back from the
+review until it can be read.
+
 ## 2.3.2
 
 A WebDAV scan used to end on a line that read as a failure:

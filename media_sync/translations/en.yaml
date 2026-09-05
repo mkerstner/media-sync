@@ -147,6 +147,16 @@ configuration:
           a long way, to 2 or 3, if the folders are Nextcloud external storage:
           each request then opens a connection to whatever is behind it, and
           those are limited. Ignored when connecting over SSH.
+      webdav_http1:
+        name: Use HTTP/1.1 for WebDAV
+        description: >-
+          On by default. Over HTTP/2 every request shares one connection, and a
+          server limits how many it will carry before closing it. Listing a
+          deep folder tree runs to thousands of requests, so the connection is
+          dropped mid-scan and the run ends with "server sent GOAWAY". HTTP/1.1
+          spreads the same work over several connections instead. Turn it off
+          only if your server handles HTTP/2 well and you want the small gain.
+          Ignored over SSH.
       skip_unchanged:
         name: Skip folders that have not changed
         description: >-

@@ -1,5 +1,5 @@
 name: Media Sync
-version: "2.3.2"
+version: "2.3.3"
 slug: media_sync
 url: https://github.com/mkerstner/media-sync/tree/main/media_sync
 description: Two-way sync between your media library and a remote server, over SSH or WebDAV such as Nextcloud - from the UI, an automation or a terminal
@@ -75,6 +75,7 @@ options:
     sync_log_verbosity: summary
     log_keep_days: 14
     webdav_parallel: 16
+    webdav_http1: true
     skip_unchanged: true
     change_depth: 2
 schema:
@@ -108,5 +109,6 @@ schema:
     sync_log_verbosity: list(quiet|summary|files|changes|progress|debug)
     log_keep_days: int(1,365)
     webdav_parallel: int(1,64)
+    webdav_http1: bool
     skip_unchanged: bool
     change_depth: int(0,10)

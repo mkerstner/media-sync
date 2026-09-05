@@ -265,6 +265,29 @@ bandwidth, and the things that help are the ones that reduce or overlap them:
   providers are similar. Ask for more than the limit and requests start
   failing for want of a connection, which surfaces as a folder that lists and
   then cannot be opened. Try 2 or 3 and see whether the failures stop.
+- **Use HTTP/1.1 for WebDAV**, under Advanced and on by default, decides how
+  those round trips are carried.
+
+  Over HTTP/2 they all share one connection, and a server puts a limit on how
+  many requests one connection may carry. A deep tree runs to thousands, so the
+  limit is reached partway through and the server closes the connection, taking
+  every request still in flight with it:
+
+  ```
+  http2: server sent GOAWAY and closed the connection; LastStreamID=6623,
+  ErrCode=unknown error code 0xfffffc7a, debug="The user callback function failed"
+  ```
+
+  That code is nghttp2's "callback failure", so it is the Apache in front of
+  Nextcloud giving up on the connection rather than the app giving up on a
+  request. **Lowering Parallel WebDAV requests does not help**: the limit counts
+  requests over the life of one connection, not how many run at once. HTTP/1.1
+  spreads the same work over a pool of connections and recycles them as it goes.
+
+  Nothing is deleted because of it. A folder whose listing failed is reported as
+  unreadable, and everything inside it is held back from the review until it can
+  be read.
+
 - **Exclude what you do not sync.** Anything not excluded is walked in full,
   every run, even if nothing in it ever changes.
 - **Point the pair at a smaller folder**, or use the include list, rather than

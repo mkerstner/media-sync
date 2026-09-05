@@ -69,6 +69,27 @@ WEBDAV_PASS="${WEBDAV_PASS:-}"
 # it is a setting rather than a constant.
 WEBDAV_PARALLEL="${WEBDAV_PARALLEL:-16}"
 
+# Speak HTTP/1.1 to a WebDAV share rather than HTTP/2.
+#
+# Over HTTP/2 every request is a stream on one connection, and a server puts a
+# limit on how many streams one connection may carry. Listing a deep tree runs
+# to thousands of requests, so the limit is reached and the server sends GOAWAY
+# and closes the connection - taking every request still in flight with it:
+#
+#   http2: server sent GOAWAY and closed the connection; LastStreamID=6623,
+#   ErrCode=unknown error code 0xfffffc7a, debug="The user callback function failed"
+#
+# 0xfffffc7a is -902, which is nghttp2's "callback failure", so this is the
+# Apache in front of Nextcloud giving up on the connection rather than rclone
+# giving up on a request. Lowering the number of parallel requests does not
+# help: the limit counts requests over the life of one connection, not how
+# many run at once.
+#
+# HTTP/1.1 spreads the same work over a pool of connections and recycles them
+# as it goes, which is why this is on by default for a protocol whose usual
+# server is exactly that Apache.
+WEBDAV_HTTP1="${WEBDAV_HTTP1:-1}"
+
 # Skip a folder pair when neither side has changed since it last synced. Only
 # meaningful over WebDAV, where finding that out any other way means listing
 # the whole tree one directory at a time.
@@ -551,6 +572,7 @@ RCLONE_BASE="--update --checkers $WEBDAV_PARALLEL --transfers 4"
 # Without these a dead connection is indistinguishable from a slow one, and
 # the run waits for ever rather than failing with something to read.
 RCLONE_NET="--contimeout 30s --timeout 5m --retries 3 --low-level-retries 5"
+[ "$WEBDAV_HTTP1" -eq 1 ] && RCLONE_NET="$RCLONE_NET --disable-http2"
 
 if [ "$DRY_RUN" -eq 1 ]; then
   RSYNC_OUT="--dry-run --itemize-changes --stats"
