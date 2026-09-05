@@ -166,27 +166,35 @@ and exclude rules, deletion protection, and the folder-by-folder review.
 ### What the scan reports while it runs
 
 A WebDAV scan has to ask the server about one folder at a time, so on a large
-share it runs for a while. Every thirty seconds it prints where it has got to:
+share it runs for a while. Every thirty seconds it says where it has got to:
 
 ```
-Checks:              5114 / 5114, 100%, Listed 11963
+2026-09-05 15:24:50 [Photos push] compared 5114 items so far
 ```
 
-**Checks** is how many items have been compared, **Listed** how many the server
-has named so far. Both climb until the scan finishes. Nothing is transferred
-while scanning, so there is no byte counter.
+Nothing is transferred while scanning, so there is no byte counter - and no
+percentage either: the tool underneath reports the total as whatever it has
+reached so far, so its own "100%" would read true from the very first line.
 
-Two things the underlying tool also reports are left out of the log, because
-neither means what it says. It counts every file that exists on one side and
-not the other as an error - that is how it signals "these two are not
-identical" to whatever called it - and prints one such line per item, plus a
-running total, plus the words "retrying may help". On a first run that total
-reaches the thousands, and every one of those items is the answer the scan was
-asked for rather than a problem with it. They are already on their way to the
-review.
+Everything else it prints is left out, because a scan has one useful answer and
+the app states that itself in the lines that follow. In that tool's vocabulary
+a file on one side and not the other counts as an *error* - that is how it
+signals "these two are not identical" to whatever called it - so a first run
+used to end on:
 
-A real failure is not filtered. It names a folder and says it could not be
-read, and it is worth reading.
+```
+NOTICE: Failed to check with 4530 errors: last error was: 4530 differences found
+```
+
+Nothing failed there. That is the number of items the review is about to ask
+you about, and it is now said in those words instead.
+
+Three things are never filtered out: a folder that could not be read, an item
+that could not be compared, and anything meaning the answer cannot be trusted
+at all - a wrong address, a refused password, a server that did not answer.
+Those are rewritten into plain words rather than dropped.
+
+Run with `--verbose` to see the tool's own output untouched.
 
 ### When some items cannot be transferred
 

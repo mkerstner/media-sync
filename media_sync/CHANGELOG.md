@@ -1,5 +1,34 @@
 # Changelog
 
+## 2.3.2
+
+A WebDAV scan used to end on a line that read as a failure:
+
+```
+NOTICE: Failed to check with 3 errors: last error was: 3 differences found
+```
+
+Nothing had failed. In the underlying tool's vocabulary a file on one side and
+not the other counts as an *error* - that is how it signals "these two are not
+identical" - so on a first run that number reaches the thousands, and every one
+of them is the answer the scan was asked for.
+
+- **What reaches the log is now decided by what is allowed through, rather than
+  by naming the noise.** The old list had to be extended every time the tool
+  found a new way to say the same thing, and it had leaked three times.
+- Progress is stated in the app's own words, with a timestamp and the folder
+  pair, like every other line: `compared 5114 items so far`. The percentage is
+  gone - the total was only ever "as many as reached so far", so it read 100%
+  from the first line onwards.
+- Three things are never filtered: a folder that could not be read, an item
+  that could not be compared, and anything meaning the answer cannot be trusted
+  at all - a wrong address, a refused password, a server that did not answer.
+  Those are rewritten into plain words rather than dropped.
+- `--verbose` hands over the tool's own output untouched, for when what it said
+  matters more than how it reads.
+
+Only the WebDAV scan was ever noisy; the rsync one never printed this at all.
+
 ## 2.3.1
 
 Applying a review of several hundred deletions took about an hour.

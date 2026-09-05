@@ -676,20 +676,76 @@ scan_deletes() {   # $1 = source, $2 = destination
     # for minutes with nothing to show otherwise.
     _scan_out="/tmp/media-sync.scan.$$"
     _scan_err="/tmp/media-sync.scanerr.$$"
+    # What reaches the log is decided by what is allowed through, not by what
+    # is blocked. Naming the noise meant a new kind of noise arrived with
+    # every rclone release, and the worst of it read as a failure: with
+    # --missing-on-src every one-sided file counts as an "error", so
+    # "Failed to check with 3 errors" is rclone's way of saying "3
+    # differences" - the very answer this scan exists to produce, which the
+    # app then prints properly two lines later.
+    #
+    # -v and the debug level hand over the stream untouched, for the times
+    # when what rclone said matters more than how it reads.
+    case "$VERBOSITY" in files|debug) _scan_raw=1 ;; *) _scan_raw=0 ;; esac
     rclone check "$1" "$2" --size-only --missing-on-src - \
         --filter-from "$FILTER_FILE" $RCLONE_NET --stats 30s \
         --stats-log-level NOTICE < /dev/null 2>&1 >"$_scan_out" \
       | tee "$_scan_err" \
-      | awk '
+      | awk -v raw="$_scan_raw" '
+          raw == 1 { print; fflush(); next }
+
+          # Progress. rclone counts a check the moment it makes one and gives
+          # the total as whatever it has reached, so its "100%" says nothing
+          # while the scan is still running. The count is the useful part.
+          /^Checks:/ { printf "compared %s items so far\n", $2; fflush(); next }
+
           # A file on one side and not the other. That is the answer, not a
           # failure, and it is already going into the candidate list.
           / ERROR : .*: file not in / { next }
-          # Of the stats block, only the check count says anything during a
-          # scan: nothing is transferred, and "Errors" counts the differences.
-          /^Transferred:|^Errors:|^Elapsed time:/ { next }
-          /NOTICE: *$/ { next }
-          { print; fflush() }
-        ' >&2 || true
+
+          # Reported on its own once the scan has finished, together with what
+          # it means for the result, so repeating it here says it twice.
+          /error reading (source|destination) directory/ { next }
+
+          # Nothing rclone says at NOTICE adds to a scan: the stats block,
+          # "N differences found", "N files missing" and "Failed to check with
+          # N errors" all restate the answer, and the last of them reads as a
+          # failure when it is the ordinary result.
+          / NOTICE: / { next }
+
+          # A problem with one item, which is worth seeing.
+          / ERROR : / {
+            sub(/^[^ ]* [^ ]* ERROR : /, "")
+            printf "could not compare %s\n", $0
+            fflush()
+            next
+          }
+
+          # A problem with the whole operation. The only unrecognised lines
+          # that get through, because they are the ones that mean the answer
+          # cannot be trusted at all.
+          /Failed to create file system|couldn.t connect|CRITICAL|Fatal error/ {
+            # Only strip a leading date and time, and only when that is what
+            # the first two fields are. Some of these arrive without one, and
+            # blindly dropping two words would eat the message.
+            if (index($1, "/") > 0 && index($2, ":") > 0) {
+              sub(/^[^ ]* [^ ]* /, "")
+            }
+            print
+            fflush()
+            next
+          }
+        ' \
+      | while IFS= read -r _scan_line; do
+          # Untouched means untouched: in raw mode the tool's own timestamps
+          # are already there, and stamping them a second time is exactly the
+          # kind of thing this release is getting rid of.
+          if [ "$_scan_raw" -eq 1 ]; then
+            printf '%s\n' "$_scan_line"
+          else
+            log "[$label] $_scan_line"
+          fi
+        done >&2 || true
 
     # A folder the listing could not read at all:
     #
