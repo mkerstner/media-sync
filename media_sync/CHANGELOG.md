@@ -1,5 +1,31 @@
 # Changelog
 
+## 2.3.5
+
+Files deleted on the Home Assistant side went unreported again, this time for
+a different reason than in 2.3.0.
+
+- **The change check no longer narrows a run when this side has changed.** The
+  descent added in 2.2.0 follows folders whose tag moved *on the server*, and a
+  deletion here moves nothing there. The scan reads the same filter, so the one
+  folder that had changed was excluded from it and the deletions were never
+  looked for. When this side has moved, the pair is compared in full - which is
+  what happened before 2.2.0 anyway. Narrowing still applies to the common
+  case, where only the server has changed.
+- **A find that fails is no longer read as "nothing has changed".** The local
+  check hid its own errors and an empty answer meant "all quiet", so any
+  failure looked exactly like a folder in which nothing had happened. Anything
+  it cannot establish now counts as changed, which is the rule everywhere else
+  in the app.
+- **-quit is no longer assumed.** Not every find has it, and one that does not
+  prints an error and stops - which the point above then read as "all quiet".
+  Which form to use is settled once, at startup.
+- The skip line now says what it checked, so a wrong answer can be seen rather
+  than guessed at.
+- Stamps written by an earlier version are retired: one of them may say a pair
+  is settled when a deletion on this side was never looked for. The first run
+  after this update compares everything.
+
 ## 2.3.4
 
 Fixes a line 2.3.2 introduced:

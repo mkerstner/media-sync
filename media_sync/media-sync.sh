@@ -1255,8 +1255,34 @@ transfer_one_way() {   # $1 = label, $2 = source, $3 = destination, $4 = deletes
 # completed sync, and its modification time is when that sync happened, which
 # is what the local side gets compared against.
 
+# Not every find understands -quit, and one that does not prints an error and
+# gives up. Reading that as "nothing has changed" would hide every deletion
+# made on this side, so which form to use is settled once, here.
+if find . -maxdepth 0 -quit >/dev/null 2>&1; then FIND_QUIT="-quit"; else FIND_QUIT=""; fi
+
+# Whether anything in the local half of a pair has been touched since the
+# stamp was written. A change moves the time of the file; a deletion moves the
+# time of the folder that held it.
+#
+# Anything this cannot establish counts as changed. That is the rule
+# everywhere else in this file, and it matters most here: a find that fails
+# prints nothing, and treating nothing as "all quiet" is exactly how files
+# deleted on this side go unnoticed.
+LOCAL_CHANGE=""
+local_changed() {   # $1 = stamp file, $2 = local path
+  LOCAL_CHANGE=""
+  [ -f "$1" ] || return 0
+  [ -d "$2" ] || return 0
+  if LOCAL_CHANGE="$(find "$2" -newer "$1" -print $FIND_QUIT 2>/dev/null)"; then
+    [ -n "$LOCAL_CHANGE" ] || return 1
+    return 0
+  fi
+  LOCAL_CHANGE=""
+  return 0
+}
+
 pair_stamp() {   # $1 = pair label
-  printf '%s/.pair2-%s' "$STATE_DIR" "$(printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '_')"
+  printf '%s/.pair3-%s' "$STATE_DIR" "$(printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '_')"
 }
 
 # When a pair last synced, taken from the stamp's own modification time.
@@ -1302,10 +1328,9 @@ pair_unchanged() {   # $1 = label, $2 = remote path, $3 = local path
   [ -n "$_now" ] || return 1
   [ "$_now" = "$(cat "$_stamp" 2>/dev/null)" ] || return 1
 
-  # A local change moves a file's time, and a local deletion moves the time of
-  # the folder that held it, so both are caught. -quit stops at the first one.
-  [ -d "$3" ] || return 1
-  [ -z "$(find "$3" -newer "$_stamp" -print -quit 2>/dev/null)" ] || return 1
+  # A local change moves the time of the file, a local deletion the time of
+  # the folder that held it, so both are caught.
+  local_changed "$_stamp" "$3" && return 1
 
   return 0
 }
@@ -1711,16 +1736,25 @@ while IFS='|' read -r name rsub lloc pair_excl; do
   if pair_unchanged "$name" "$rpath" "$lpath"; then
     _when="$(stamp_time "$(pair_stamp "$name")" || true)"
     log "[$name] nothing has changed on either side since the last sync${_when:+ at $_when} - skipped"
+    log "      the server tag is unchanged and nothing under $lpath is newer than then"
     continue
   fi
 
   # Something changed. Work out how much of the tree that actually covers, so
   # the comparison is limited to it rather than to everything.
-  if _narrow="$(changed_filter "$name" "$rpath")" && [ -n "$_narrow" ]; then
+  #
+  # The descent follows folders whose tag moved on the *server*. A change made
+  # on this side moves nothing there, so narrowing by it would leave out the
+  # very folder that changed here - and the scan reads the same filter, so
+  # files deleted on this side were never even looked for. When this side has
+  # moved, the pair is compared in full.
+  if local_changed "$(pair_stamp "$name")" "$lpath"; then
+    log "[$name] this side has changed - comparing the whole pair"
+  elif _narrow="$(changed_filter "$name" "$rpath")" && [ -n "$_narrow" ]; then
     printf '%s\n' "$_narrow" >> "$FILTER_FILE"
     printf -- '- **\n' >> "$FILTER_FILE"
     _folders="$(printf '%s\n' "$_narrow" | grep -c -- '/[*][*]$' || true)"
-    log "[$name] $_folders folder(s) changed - comparing only those"
+    log "[$name] $_folders folder(s) changed on the server and nothing here - comparing only those"
   fi
 
   # Every scan runs before any transfer, so that what one direction is about
